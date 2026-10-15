@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.toka</groupId>
   <artifactId>tokaDiscordLink</artifactId>
-  <version>0.1.1</version>
+  <version>0.1.3</version>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
@@ -87,6 +87,11 @@
               </filters>
               <!-- The server brings its own jackson, so the copies of JDA are moved out of its way -->
               <relocations>
+                <!-- The server has an old SLF4J without a logging backend; our own copy carries the bridge to the server log -->
+                <relocation>
+                  <pattern>org.slf4j</pattern>
+                  <shadedPattern>dev.toka.discord.internal.slf4j</shadedPattern>
+                </relocation>
                 <relocation>
                   <pattern>com.fasterxml.jackson</pattern>
                   <shadedPattern>dev.toka.discord.internal.jackson</shadedPattern>
