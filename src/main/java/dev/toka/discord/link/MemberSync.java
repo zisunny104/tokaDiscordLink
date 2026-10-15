@@ -1,0 +1,186 @@
+package dev.toka.discord.link;
+
+import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.utils.Config;
+import dev.toka.discord.Main;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.UserSnowflake;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+
+/**
+ * Keeps the Discord side of a linked account in line with the game: the nickname, and the Discord roles that
+ * belong to the groups the player has.
+ * <p>
+ * The nickname is taken over as soon as the accounts are linked ({@code nickname.mode: set}); with
+ * {@code enforce} it is also put back when the member changes it. The roles only flow from the game to Discord,
+ * and only the roles that are listed in {@code roles} are touched. The role mapping waits for the new permission
+ * groups: while it is empty nothing is changed.
+ */
+public final class MemberSync {
+
+    public enum NicknameMode { OFF, SET, ENFORCE }
+
+    private final Main plugin;
+    private final LinkService links;
+    private final NicknameMode nicknameMode;
+    private final String nicknameFormat;
+    /** group name in the game -> id of the Discord role */
+    private final Map<String, String> roles = new LinkedHashMap<>();
+
+    private volatile JDA jda;
+    private volatile String guildId;
+    private volatile Function<UUID, String> nameProvider = null;
+
+    public MemberSync(Main plugin, LinkService links, Config config) {
+        this.plugin = plugin;
+        this.links = links;
+        this.nicknameMode = parseMode(config.getString("nickname.mode", "set"));
+        this.nicknameFormat = config.getString("nickname.format", "{name}");
+        Object mapped = config.get("roles");
+        if (mapped instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) mapped).entrySet()) {
+                String role = String.valueOf(e.getValue()).trim();
+                if (!role.isEmpty() && !role.equals("null")) {
+                    this.roles.put(String.valueOf(e.getKey()), role);
+                }
+            }
+        }
+    }
+
+    public static NicknameMode parseMode(String value) {
+        switch (value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "off":
+                return NicknameMode.OFF;
+            case "enforce":
+                return NicknameMode.ENFORCE;
+            default:
+                return NicknameMode.SET;
+        }
+    }
+
+    public NicknameMode nicknameMode() {
+        return this.nicknameMode;
+    }
+
+    public int roleMappings() {
+        return this.roles.size();
+    }
+
+    public static String nickname(String format, String name) {
+        String result = format.replace("{name}", name).trim();
+        // a nickname is at most 32 characters
+        return result.length() > 32 ? result.substring(0, 32) : result;
+    }
+
+    /** Where to find the Discord server of the bot. */
+    public void attach(JDA jda, String guildId) {
+        this.jda = jda;
+        this.guildId = guildId;
+    }
+
+    /** Another plugin can supply the name to show, for example one with a title in front of it. */
+    public void setNameProvider(Function<UUID, String> provider) {
+        this.nameProvider = provider;
+    }
+
+    private String nameOf(UUID player) {
+        Function<UUID, String> provider = this.nameProvider;
+        String name = provider == null ? null : provider.apply(player);
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+        Player online = Server.getInstance().getPlayer(player).orElse(null);
+        if (online != null) {
+            return online.getName();
+        }
+        return Server.getInstance().getOfflinePlayer(player).getName();
+    }
+
+    /** The nickname the member should have, or null when it is not managed. */
+    public String expectedNickname(UUID player) {
+        if (this.nicknameMode == NicknameMode.OFF) {
+            return null;
+        }
+        String name = this.nameOf(player);
+        return name == null || name.isBlank() ? null : nickname(this.nicknameFormat, name);
+    }
+
+    /** Brings the nickname and the roles of one linked account in line with the game. Never blocks the caller. */
+    public void sync(UUID player, String discordUserId) {
+        JDA client = this.jda;
+        if (client == null || this.guildId == null) {
+            return;
+        }
+        Guild guild = client.getGuildById(this.guildId);
+        if (guild == null) {
+            return;
+        }
+        guild.retrieveMemberById(discordUserId).queue(member -> this.apply(guild, member, player), error -> { });
+    }
+
+    private void apply(Guild guild, Member member, UUID player) {
+        String nick = this.expectedNickname(player);
+        if (nick != null && !nick.equals(member.getNickname()) && !member.isOwner()
+                && guild.getSelfMember().canInteract(member)) {
+            member.modifyNickname(nick).queue(null, error -> { });
+        }
+
+        if (this.roles.isEmpty()) {
+            return;
+        }
+        Player online = Server.getInstance().getPlayer(player).orElse(null);
+        if (online == null) {
+            // the groups of a player that is not online cannot be asked, so nothing is taken away
+            return;
+        }
+        for (Map.Entry<String, String> mapping : this.roles.entrySet()) {
+            Role role = guild.getRoleById(mapping.getValue());
+            if (role == null || !guild.getSelfMember().canInteract(role)) {
+                continue;
+            }
+            boolean should = online.hasPermission("group." + mapping.getKey());
+            boolean has = member.getRoles().contains(role);
+            if (should && !has) {
+                guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(null, error -> { });
+            } else if (!should && has) {
+                guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(null, error -> { });
+            }
+        }
+    }
+
+    /** A member wrote something: with {@code enforce} the nickname is put back at once. */
+    public void onMemberSeen(Member member) {
+        if (this.nicknameMode != NicknameMode.ENFORCE) {
+            return;
+        }
+        UUID player = this.links.playerOf(member.getId()).orElse(null);
+        if (player == null) {
+            return;
+        }
+        String nick = this.expectedNickname(player);
+        if (nick != null && !nick.equals(member.getNickname()) && !member.isOwner()
+                && member.getGuild().getSelfMember().canInteract(member)) {
+            member.modifyNickname(nick).queue(null, error -> { });
+        }
+    }
+
+    /** All the linked accounts, one after the other, spread over the given time so that the rate limits hold. */
+    public void syncAll() {
+        Map<UUID, String> all = this.links.all();
+        long delay = 0;
+        for (Map.Entry<UUID, String> entry : all.entrySet()) {
+            final long at = delay;
+            this.plugin.getServer().getScheduler().scheduleDelayedTask(this.plugin,
+                    () -> this.sync(entry.getKey(), entry.getValue()), (int) at);
+            delay += 10;
+        }
+    }
+}
