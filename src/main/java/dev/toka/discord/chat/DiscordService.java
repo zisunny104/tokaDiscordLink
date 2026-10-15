@@ -71,6 +71,8 @@ public final class DiscordService implements DiscordLink.Transport {
 
     private void connect(Config config, String token) {
         try {
+            // JDA looks for its SLF4J provider through the context class loader, which on the server is not the plugin's
+            Thread.currentThread().setContextClassLoader(DiscordService.class.getClassLoader());
             // Nobody on the server is pinged by what the game sends
             MessageRequest.setDefaultMentions(EnumSet.noneOf(Message.MentionType.class));
 
