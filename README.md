@@ -35,6 +35,7 @@
 | `token`、`msg-channel-id`、`cmd-channel-id` | 機器人令牌與頻道 ID |
 | `discord-command-prefix` | Discord 指令前綴，留空代表不用 |
 | `storage.backend` | 綁定資料的儲存方式：`sqlite`（預設）、`json`、`yaml` |
+| （資料位置） | 綁定資料在 `plugins/tokaDiscordLink/storage/sqlite/`。0.1.5 起，舊的 `links/` 資料夾會在啟動時複製過去並逐位元組比對，舊資料夾保留不刪；啟動日誌會寫「載入綁定共 N 個」 |
 | `link.code-ttl-seconds`、`link.max-attempts`、`link.lockout-seconds` | 代碼有效時間（預設 600 秒）、可嘗試次數（5）、鎖定時間（600 秒） |
 | `nickname.mode` | `off`（不管）、`set`（綁定後設定，預設）、`enforce`（被改掉後下次發言改回） |
 | `nickname.format` | 暱稱格式，`{name}` 是遊戲名稱，最長 32 字元 |

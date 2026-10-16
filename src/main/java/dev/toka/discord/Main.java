@@ -33,19 +33,63 @@ public final class Main extends PluginBase implements Listener {
     private DiscordService service;
     private String disabledReason;
 
+    /**
+     * The links are kept in plugins/tokaDiscordLink/storage/sqlite/ like the other plugins. The folder links/ of an
+     * earlier version is copied there once and compared byte by byte; the old folder stays where it is.
+     */
+    private Path storageDirectory(Backend backend) {
+        Path folder = this.getDataFolder().toPath().toAbsolutePath().normalize();
+        Path legacy = folder.resolve("links");
+        Path target = folder.resolve("storage").resolve(backend.name().toLowerCase(Locale.ROOT));
+        if (java.nio.file.Files.exists(target) || backend != Backend.SQLITE
+                || !java.nio.file.Files.isRegularFile(legacy.resolve("documents.sqlite"))) {
+            return java.nio.file.Files.exists(target) || !java.nio.file.Files.isDirectory(legacy) ? target : legacy;
+        }
+        Path staging = folder.resolve("storage").resolve(".copy-" + java.util.UUID.randomUUID());
+        try {
+            java.nio.file.Files.createDirectories(staging);
+            try (var files = java.nio.file.Files.list(legacy)) {
+                for (Path file : (Iterable<Path>) files::iterator) {
+                    if (!java.nio.file.Files.isRegularFile(file) || file.getFileName().toString().equals(".store.lock")) {
+                        continue;
+                    }
+                    Path copy = staging.resolve(file.getFileName());
+                    java.nio.file.Files.copy(file, copy);
+                    if (java.nio.file.Files.mismatch(file, copy) != -1L) {
+                        throw new java.io.IOException("copy differs: " + file.getFileName());
+                    }
+                }
+            }
+            java.nio.file.Files.move(staging, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            this.getLogger().info("綁定資料已從 links 複製到 storage/sqlite，舊的 links 資料夾保留不刪");
+            return target;
+        } catch (java.io.IOException | RuntimeException error) {
+            this.getLogger().warning("無法把綁定資料複製到 storage/sqlite，繼續使用舊的 links 資料夾：" + error.getMessage());
+            try (var leftover = java.nio.file.Files.walk(staging)) {
+                for (Path file : (Iterable<Path>) leftover.sorted(java.util.Comparator.reverseOrder())::iterator) {
+                    java.nio.file.Files.deleteIfExists(file);
+                }
+            } catch (java.io.IOException | RuntimeException ignored) {
+                // the folder with the copy is only a temporary one
+            }
+            return legacy;
+        }
+    }
+
     @Override
     public void onEnable() {
         this.saveDefaultConfig();
 
         try {
             Backend backend = Backend.valueOf(this.getConfig().getString("storage.backend", "sqlite").toUpperCase(Locale.ROOT));
-            Path directory = this.getDataFolder().toPath().resolve("links").toAbsolutePath().normalize();
+            Path directory = this.storageDirectory(backend);
             DocumentStore store = DocumentStore.open(new StoreConfig(backend, directory, 1));
             PendingCodes codes = new PendingCodes(System::currentTimeMillis,
                     this.getConfig().getInt("link.code-ttl-seconds", 600),
                     this.getConfig().getInt("link.max-attempts", 5),
                     this.getConfig().getInt("link.lockout-seconds", 600));
             this.links = new LinkService(store, System::currentTimeMillis, codes);
+            this.getLogger().info("載入綁定共 " + this.links.count() + " 個");
         } catch (Exception e) {
             this.getLogger().error("綁定資料無法開啟，Discord 串聯停用，原資料沒有被更動", e);
             this.disabledReason = "綁定資料無法開啟：" + e.getMessage();
