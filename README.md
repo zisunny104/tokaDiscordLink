@@ -1,6 +1,6 @@
 # tokaDiscordLink
 
-整體拆分現況只維護於 [拆分主文件](https://github.com/zisunny104/tokaProfiles/blob/main/docs/ARCHITECTURE.md)；本 README 維護本專案的設定、API 與使用限制。
+整體拆分現況只維護於 [拆分主文件](https://github.com/zisunny104/zero/blob/master/docs/ARCHITECTURE.md)；本 README 維護本專案的設定、API 與使用限制。
 
 遊戲與 Discord 之間的串聯，給 Nukkit 伺服器使用。負責機器人連線、聊天訊息與指令的收發、遊戲與 Discord 帳號的一對一綁定，以及綁定後的暱稱同步。它**不認識 zero**，也不依賴其他遊戲插件，其他插件透過 `DiscordLink` API 與事件使用它。
 
@@ -96,4 +96,5 @@ if (DiscordLink.isReady()) {
 
 ## 授權
 本專案以 MIT 授權，見 [LICENSE](LICENSE)。打包時包含 JDA 與其他相依套件，各依其授權，清單見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 
