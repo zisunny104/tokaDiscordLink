@@ -61,10 +61,10 @@ public final class Main extends PluginBase implements Listener {
                 }
             }
             java.nio.file.Files.move(staging, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-            this.getLogger().info("綁定資料已從 links 複製到 storage/sqlite，舊的 links 資料夾保留不刪");
+            this.getLogger().info("§a綁定資料已從 links 複製到 storage/sqlite，舊的 links 資料夾保留不刪");
             return target;
         } catch (java.io.IOException | RuntimeException error) {
-            this.getLogger().warning("無法把綁定資料複製到 storage/sqlite，繼續使用舊的 links 資料夾：" + error.getMessage());
+            this.getLogger().warning("§e無法把綁定資料複製到 storage/sqlite，繼續使用舊的 links 資料夾：" + error.getMessage());
             try (var leftover = java.nio.file.Files.walk(staging)) {
                 for (Path file : (Iterable<Path>) leftover.sorted(java.util.Comparator.reverseOrder())::iterator) {
                     java.nio.file.Files.deleteIfExists(file);
@@ -89,7 +89,7 @@ public final class Main extends PluginBase implements Listener {
                     this.getConfig().getInt("link.max-attempts", 5),
                     this.getConfig().getInt("link.lockout-seconds", 600));
             this.links = new LinkService(store, System::currentTimeMillis, codes);
-            this.getLogger().info("載入綁定共 " + this.links.count() + " 個");
+            this.getLogger().info("§b載入綁定共 §a" + this.links.count() + " §b個");
         } catch (Exception e) {
             this.getLogger().error("綁定資料無法開啟，Discord 串聯停用，原資料沒有被更動", e);
             this.disabledReason = "綁定資料無法開啟：" + e.getMessage();

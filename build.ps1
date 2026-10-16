@@ -22,10 +22,10 @@ try {
     & $Maven @common clean install
     if ($LASTEXITCODE) { throw 'Build failed. See Maven errors above.' }
     New-Item -ItemType Directory -Force output | Out-Null
-    Copy-Item -LiteralPath 'target/tokaDiscordLink-0.1.5.jar' -Destination 'output/tokaDiscordLink-0.1.5.jar' -Force
+    Copy-Item -LiteralPath 'target/tokaDiscordLink-0.1.6.jar' -Destination 'output/tokaDiscordLink-0.1.6.jar' -Force
     # A config.yml that can be copied to plugins/tokaDiscordLink/ as it is
     Copy-Item -LiteralPath 'src/main/resources/config.yml' -Destination 'output/config.yml' -Force
-    Get-FileHash 'output/tokaDiscordLink-0.1.5.jar'
+    Get-FileHash 'output/tokaDiscordLink-0.1.6.jar'
 } finally {
     $env:JAVA_HOME = $previousJava
     Pop-Location
