@@ -1,57 +1,76 @@
 # tokaDiscordLink
 
-**tokaDiscordLink 0.2.1** 是 Nukkit 伺服器與 Discord 之間的串聯：機器人連線、聊天與指令收發、遊戲與 Discord 帳號一對一綁定，以及綁定後的暱稱同步。不依賴其他遊戲插件；其他插件透過 `DiscordLink` API 與事件使用。本插件不收集任何使用統計。
+連接伺服器與 Discord 的橋樑：機器人上線、玩家綁定自己的 Discord 帳號、同步暱稱，並讓其他插件收發 Discord 頻道的訊息與指令。
 
-## 安裝
+## 主要功能
 
-- 需要 Java 21 與一個 Discord 機器人；在 Developer Portal 的 Bot 頁面開啟 **Message Content Intent**。
-- 機器人需能看到並發言於設定的頻道；同步暱稱另需「管理暱稱」權限，且角色高於對方。
-- 將 `tokaDiscordLink-0.2.1.jar` 放入 `plugins/`，啟動一次後填寫 `config.yml` 的 `token`、`msg-channel-id`，再重啟。未填時插件停用 Discord，不影響伺服器。
-- 令牌等同密碼，請勿貼到聊天室或提交到 Git。
-- 不可與舊的 `one` 插件同時執行。
-- 使用共用套件 tokaStorage 與 tokaI18n，皆已內嵌於 JAR。
+- **機器人連線**：填入令牌與頻道後，機器人會連上 Discord，並在開服與關服時於聊天頻道發出提示。
+- **帳號綁定**：玩家與 Discord 帳號一對一綁定，用一次性代碼確認，代碼預設 10 分鐘有效，連續輸入錯誤會暫時鎖定。
+- **暱稱同步**：綁定後，Discord 暱稱會改成遊戲名稱，之後定期更新。
+- **供其他插件使用**：聊天頻道的訊息與指令會轉成事件；其他插件也能透過 API 把訊息送到 Discord。本插件本身不轉送遊戲聊天。
 
-## 指令與權限
+## 玩家怎麼用
 
-遊戲內：`/discord [link [代碼]｜unlink｜info｜status｜help]`；Discord 內：`/link [code]`、`/unlink`。代碼一次性、預設 10 分鐘有效，連續輸入錯誤會暫時鎖定。
+| 指令 | 說明 |
+| --- | --- |
+| `/discord` 或 `/discord info` | 查看自己的綁定 |
+| `/discord link` | 產生綁定代碼，到 Discord 輸入 `/link code:代碼` 完成綁定 |
+| `/discord link <代碼>` | 例：`/discord link 123456`，輸入 Discord 的 `/link` 給你的代碼 |
+| `/discord unlink` | 解除自己的綁定 |
+| `/discord help` | 顯示說明 |
 
-| 權限 | 說明 | 預設 |
-| --- | --- | --- |
-| `tokaDiscordLink.use` | 綁定、解除與查看自己的綁定 | 所有人 |
-| `tokaDiscordLink.admin` | 查看狀態，替別人綁定、解除與查看 | OP |
+在 Discord 也可以反過來：輸入 `/link` 取得代碼，再到遊戲輸入 `/discord link <代碼>`；`/unlink` 解除綁定。
+（圖：Discord 中輸入 `/link` 後機器人回覆代碼的畫面）
 
-## 設定（`config.yml`）
+## 管理員怎麼用
+
+| 指令 | 用法 | 說明 | 權限 |
+| --- | --- | --- | --- |
+| `/discord status` | `/discord status` | 查看機器人連線、頻道與綁定狀態 | `tokaDiscordLink.admin` |
+| `/discord link` | `/discord link <玩家> <Discord使用者ID>` | 替玩家直接綁定（玩家需進過伺服器） | `tokaDiscordLink.admin` |
+| `/discord unlink` | `/discord unlink <玩家>` | 解除玩家的綁定 | `tokaDiscordLink.admin` |
+| `/discord info` | `/discord info <玩家>` | 查看玩家綁定的 Discord 使用者 ID | `tokaDiscordLink.admin` |
+
+`tokaDiscordLink.use`（綁定自己的帳號）預設所有人，`tokaDiscordLink.admin` 預設 OP；後台也可執行管理指令。
+
+初次設定：到 Discord Developer Portal 建立機器人並開啟 Message Content Intent，取得令牌，填入 `token` 與 `msg-channel-id` 後重新啟動。令牌等同密碼，請勿公開。暱稱同步需要機器人有「管理暱稱」權限，且角色高於對方；伺服器擁有者的暱稱無法更改。
+
+## 常用設定（`config.yml`，修改後需重新啟動伺服器）
 
 | key | 預設 | 說明 |
 | --- | --- | --- |
-| `language` | `zh-TW` | 語言 |
-| `token` | `""` | 機器人令牌，留空即停用 |
-| `msg-channel-id` / `cmd-channel-id` | `""` | 聊天頻道／指令結果頻道 ID |
-| `status` | `""` | 機器人狀態文字 |
-| `discord-command-prefix` | `/` | Discord 指令前綴，留空代表不用 |
-| `unknown-command-msg` | 見檔案 | 無人處理指令時的回覆 |
-| `bot-start-msg` / `bot-start-color` | 連接成功／`#00EB00` | 開服提示 |
-| `bot-stop-msg` / `bot-stop-color` | 斷開連接／`#FFA500` | 關服提示 |
-| `storage.backend` | `sqlite` | `sqlite`、`json`、`yaml` |
+| `token` | 空白 | 機器人令牌，留空代表停用串聯 |
+| `msg-channel-id` | 空白 | 聊天頻道 ID，訊息與指令都在此，留空代表停用 |
+| `cmd-channel-id` | 空白 | 指令結果頻道 ID，留空不使用 |
+| `status` | 空白 | 機器人的「正在玩…」文字 |
+| `discord-command-prefix` | `/` | 以此開頭的訊息視為指令，留空則不使用 Discord 指令 |
+| `unknown-command-msg` | 見檔案 | 無人處理指令時的回覆（`%name` 發話者、`%msg` 指令） |
+| `bot-start-msg`、`bot-stop-msg` | 連接成功／斷開連接 | 開關服提示，留空則不送 |
 | `link.code-ttl-seconds` | `600` | 綁定代碼有效秒數 |
-| `link.max-attempts` / `lockout-seconds` | `5` / `600` | 可嘗試次數與鎖定秒數 |
-| `nickname.mode` | `set` | `off`、`set`、`enforce` |
-| `nickname.format` | `{name}` | 暱稱格式，最長 32 字元 |
-| `roles` | `{}` | 權限群組對應 Discord 身分組 ID，空代表不動身分組 |
-| `sync-interval-seconds` | `300` | 暱稱與身分組同步間隔，至少 60 |
+| `link.max-attempts`、`link.lockout-seconds` | `5`、`600` | 錯誤次數上限與鎖定秒數 |
+| `nickname.mode` | `set` | `off` 不管暱稱；`set` 綁定時與定期同步；`enforce` 另在對方改回時立刻改回來 |
+| `nickname.format` | `{name}` | 暱稱格式，`{name}` 為遊戲名稱，最長 32 字元 |
+| `roles` | 空 | 權限群組對應 Discord 身分組 ID，目前預設不動身分組 |
+| `sync-interval-seconds` | `300` | 暱稱同步間隔，至少 60 |
 
-綁定資料放在 `plugins/tokaDiscordLink/storage/<格式>/`。
+## 給其他插件的串接
 
-## API
+`dev.toka.discord.api.DiscordLink` 的靜態方法；機器人未就緒時呼叫會被忽略，不會出錯。
 
-類別 `dev.toka.discord.api.DiscordLink`（機器人未就緒時安全地不做事）：`isReady()`、`sendMessage(文字[, 頻道])`、`sendEmbedMessage(文字, 顏色)`、`deleteMessage(id)`、`setIdentityResolver(...)`。事件（主執行緒）：`BotMessageEvent`、`BotCommandEvent`（處理後呼叫 `setHandled(true)`）。
+| 方法／事件 | 參數 | 用途 |
+| --- | --- | --- |
+| `isReady()` | 無 | 機器人是否已連線 |
+| `sendMessage` | 文字［, 頻道 `msg`／`cmd`］ | 送出文字訊息 |
+| `sendEmbedMessage` | 文字［, 顏色 `#RRGGBB`, 頻道］ | 送出嵌入訊息 |
+| `deleteMessage` | 訊息 ID［, 頻道］ | 刪除訊息 |
+| `setIdentityResolver` | `IdentityResolver` | 提供 Discord 帳號與玩家的對照 |
+| `BotMessageEvent` | `getMsg()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 聊天頻道的一般訊息，可取消 |
+| `BotCommandEvent` | `getCommand()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 帶前綴的指令；處理後呼叫 `setHandled(true)`，否則回覆未知指令 |
 
-## 版本紀錄
+## 常見問題
 
-- 0.2.1：文件整理。
-- 0.2.0：所有文字移入 tokaI18n `zh-TW`，新增 `/discord help`。
-- 0.1.6：維護版本。
-- 0.1.5：綁定資料移至 `storage/sqlite`（舊 `links/` 複製並比對），記錄綁定數。
-- 0.1.4：讓 JDA 透過插件 class loader 找到日誌橋接。
+- **機器人沒有上線？** 確認 `token` 與 `msg-channel-id` 已填，且已開啟 Message Content Intent。
+- **暱稱沒有變？** 檢查機器人是否有「管理暱稱」權限，且角色比對方高。
+- **綁定代碼無效？** 代碼只能用一次且會過期，連續錯誤會暫時鎖定。
 
-授權：MIT。
+目前版本 0.2.1
