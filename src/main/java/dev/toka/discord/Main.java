@@ -176,6 +176,12 @@ public final class Main extends PluginBase implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        if (this.links != null) {
+            // The last known name is display only; saving it is disk work, so it is off the server thread
+            UUID id = event.getPlayer().getUniqueId();
+            String name = event.getPlayer().getName();
+            this.getServer().getScheduler().scheduleTask(this, () -> this.links.updateName(id, name), true);
+        }
         if (this.links == null || this.service == null || !this.service.isReady()) {
             return;
         }
@@ -269,7 +275,7 @@ public final class Main extends PluginBase implements Listener {
                 sender.sendMessage(this.messages.text("err.invalidDiscordId"));
                 return;
             }
-            LinkService.Result result = this.links.link(target, discordId);
+            LinkService.Result result = this.links.link(target, discordId, this.nameOfPlayer(target));
             sender.sendMessage(this.describe(result, target));
             if (result == LinkService.Result.LINKED) {
                 this.getLogger().info(this.messages.text("log.linkedByAdmin", sender.getName(), target, discordId));
@@ -310,6 +316,9 @@ public final class Main extends PluginBase implements Listener {
                 default:
                     sender.sendMessage(this.describe(result.result(), result.match().player()));
                     if (result.result() == LinkService.Result.LINKED) {
+                        UUID linked = result.match().player();
+                        String linkedName = sender.getName();
+                        this.getServer().getScheduler().scheduleTask(this, () -> this.links.updateName(linked, linkedName), true);
                         this.sync.sync(result.match().player(), result.match().discordUser());
                     }
                     return;
@@ -380,8 +389,13 @@ public final class Main extends PluginBase implements Listener {
         return offline.getUniqueId();
     }
 
-    private String describe(LinkService.Result result, UUID player) {
+    private String nameOfPlayer(UUID player) {
         String name = Server.getInstance().getOfflinePlayer(player).getName();
+        return name != null ? name : this.links.lastNameOf(player).orElse(null);
+    }
+
+    private String describe(LinkService.Result result, UUID player) {
+        String name = this.nameOfPlayer(player);
         switch (result) {
             case LINKED:
                 return this.messages.text("msg.link.done", name == null ? player : name);

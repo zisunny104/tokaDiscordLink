@@ -180,4 +180,40 @@ public class LinkTest {
         assertEquals(MemberSync.NicknameMode.OFF, MemberSync.parseMode(" OFF "));
         assertEquals(MemberSync.NicknameMode.ENFORCE, MemberSync.parseMode("Enforce"));
     }
+
+    // ---------------------------------------------------------------- the last known name
+
+    @Test
+    public void theLastKnownNameIsKeptAndFollowsARename() throws Exception {
+        Path directory = directory();
+        UUID player = UUID.randomUUID();
+        try (LinkService links = this.service(Backend.JSON, directory)) {
+            assertEquals(LinkService.Result.LINKED, links.link(player, "111", "Old"));
+            assertEquals("Old", links.lastNameOf(player).orElse(null));
+            assertFalse(links.updateName(player, "Old"));
+            assertTrue(links.updateName(player, "New"));
+        }
+        try (LinkService links = this.service(Backend.JSON, directory)) {
+            assertEquals("New", links.lastNameOf(player).orElse(null));
+            // the link is by UUID, so it still holds
+            assertEquals(player, links.playerOf("111").orElse(null));
+            assertEquals("111", links.discordUserOf(player).orElse(null));
+            assertEquals(1, links.count());
+        }
+    }
+
+    @Test
+    public void aLinkWithoutANameStillLoadsAndTakesOneLater() throws Exception {
+        Path directory = directory();
+        UUID player = UUID.randomUUID();
+        try (LinkService links = this.service(Backend.JSON, directory)) {
+            assertEquals(LinkService.Result.LINKED, links.link(player, "222"));
+            assertTrue(links.lastNameOf(player).isEmpty());
+            assertFalse(links.updateName(UUID.randomUUID(), "Nobody"));
+            assertTrue(links.updateName(player, "Steve"));
+        }
+        try (LinkService links = this.service(Backend.JSON, directory)) {
+            assertEquals("Steve", links.lastNameOf(player).orElse(null));
+        }
+    }
 }

@@ -99,6 +99,8 @@ public final class LinkCommands extends ListenerAdapter {
         UUID player = result.match().player();
         switch (result.result()) {
             case LINKED:
+                // This runs on the worker thread, so saving the name here is fine
+                this.links.updateName(player, this.nameOf(player));
                 if (this.sync != null) {
                     this.sync.sync(player, result.match().discordUser());
                 }

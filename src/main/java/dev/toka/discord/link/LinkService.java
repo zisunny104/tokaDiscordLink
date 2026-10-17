@@ -40,6 +40,9 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
 
     private final Map<UUID, String> discordOfPlayer = new HashMap<>();
     private final Map<String, UUID> playerOfDiscord = new HashMap<>();
+    /** The last name a linked player was seen with. Display only, never used to find a link. */
+    private final Map<UUID, String> lastNames = new HashMap<>();
+    private final Map<UUID, Long> linkedAt = new HashMap<>();
 
     public LinkService(DocumentStore store, LongSupplier clock, PendingCodes codes) throws IOException {
         this.store = store;
@@ -56,6 +59,10 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
                     || this.discordOfPlayer.putIfAbsent(player, discord) != null
                     || this.playerOfDiscord.putIfAbsent(discord, player) != null) {
                 throw new IOException("Conflicting links in the store: " + entry.getKey());
+            }
+            this.linkedAt.put(player, json.has("linkedAt") ? json.get("linkedAt").getAsLong() : 0L);
+            if (json.has("name") && !json.get("name").isJsonNull() && !json.get("name").getAsString().isBlank()) {
+                this.lastNames.put(player, json.get("name").getAsString());
             }
         }
     }
@@ -79,6 +86,44 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
         return Optional.ofNullable(this.discordOfPlayer.get(playerId));
     }
 
+    /** @return the last known name of a linked player, for display only */
+    public synchronized Optional<String> lastNameOf(UUID playerId) {
+        return Optional.ofNullable(this.lastNames.get(playerId));
+    }
+
+    /**
+     * Remembers the name a linked player has now. It writes to the store only when the name changed, so call it
+     * off the server thread.
+     *
+     * @return true when the name was saved
+     */
+    public synchronized boolean updateName(UUID player, String name) {
+        String discord = this.discordOfPlayer.get(player);
+        if (discord == null || name == null || name.isBlank() || name.equals(this.lastNames.get(player))) {
+            return false;
+        }
+        JsonObject json = this.document(player, discord, name, this.linkedAt.getOrDefault(player, 0L));
+        try {
+            this.store.save(player.toString(), json);
+        } catch (IOException e) {
+            return false;
+        }
+        this.lastNames.put(player, name);
+        return true;
+    }
+
+    private JsonObject document(UUID player, String discord, String name, long linkedAt) {
+        JsonObject json = new JsonObject();
+        json.addProperty("schema", SCHEMA);
+        json.addProperty("player", player.toString());
+        json.addProperty("discord", discord);
+        json.addProperty("linkedAt", linkedAt);
+        if (name != null && !name.isBlank()) {
+            json.addProperty("name", name);
+        }
+        return json;
+    }
+
     public synchronized int count() {
         return this.discordOfPlayer.size();
     }
@@ -94,6 +139,11 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
      * a new code.
      */
     public synchronized Result link(UUID player, String discordUserId) {
+        return this.link(player, discordUserId, null);
+    }
+
+    /** Same as {@link #link(UUID, String)}, and keeps the name the player has now (display only, may be null). */
+    public synchronized Result link(UUID player, String discordUserId, String name) {
         String current = this.discordOfPlayer.get(player);
         if (current != null) {
             return current.equals(discordUserId) ? Result.ALREADY_LINKED : Result.PLAYER_HAS_OTHER;
@@ -102,11 +152,8 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
             return Result.DISCORD_HAS_OTHER;
         }
 
-        JsonObject json = new JsonObject();
-        json.addProperty("schema", SCHEMA);
-        json.addProperty("player", player.toString());
-        json.addProperty("discord", discordUserId);
-        json.addProperty("linkedAt", this.clock.getAsLong());
+        long now = this.clock.getAsLong();
+        JsonObject json = this.document(player, discordUserId, name, now);
         try {
             this.store.save(player.toString(), json);
         } catch (IOException e) {
@@ -115,6 +162,10 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
 
         this.discordOfPlayer.put(player, discordUserId);
         this.playerOfDiscord.put(discordUserId, player);
+        this.linkedAt.put(player, now);
+        if (name != null && !name.isBlank()) {
+            this.lastNames.put(player, name);
+        }
         this.codes.cancel(PendingCodes.Side.GAME, player.toString());
         this.codes.cancel(PendingCodes.Side.DISCORD, discordUserId);
         return Result.LINKED;
@@ -133,6 +184,8 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
         }
         this.discordOfPlayer.remove(player);
         this.playerOfDiscord.remove(discord);
+        this.lastNames.remove(player);
+        this.linkedAt.remove(player);
         return true;
     }
 
