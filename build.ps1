@@ -7,6 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
+$pom = [xml](Get-Content -Raw (Join-Path $PSScriptRoot 'pom.xml')); $n = $pom.project.artifactId; $v = $pom.project.version
 $previousJava = $env:JAVA_HOME
 try {
     if (!(Test-Path (Join-Path $JdkHome 'bin/java.exe'))) { throw "JDK missing: $JdkHome" }
@@ -22,10 +23,10 @@ try {
     & $Maven @common clean install
     if ($LASTEXITCODE) { throw 'Build failed. See Maven errors above.' }
     New-Item -ItemType Directory -Force output | Out-Null
-    Copy-Item -LiteralPath 'target/tokaDiscordLink-0.2.1.jar' -Destination 'output/tokaDiscordLink-0.2.1.jar' -Force
+    Copy-Item -LiteralPath "target/$n-$v.jar" -Destination "output/$n-$v.jar" -Force
     # A config.yml that can be copied to plugins/tokaDiscordLink/ as it is
     Copy-Item -LiteralPath 'src/main/resources/config.yml' -Destination 'output/config.yml' -Force
-    Get-FileHash 'output/tokaDiscordLink-0.2.1.jar'
+    Get-FileHash "output/$n-$v.jar"
 } finally {
     $env:JAVA_HOME = $previousJava
     Pop-Location
