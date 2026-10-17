@@ -10,8 +10,10 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.UserSnowflake;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -123,22 +125,37 @@ public final class MemberSync {
         if (guild == null) {
             return;
         }
-        guild.retrieveMemberById(discordUserId).queue(member -> this.apply(guild, member, player), error -> { });
+        // the game objects are read on the server thread; the Discord calls then run on the JDA threads
+        this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> {
+            String nick = this.expectedNickname(player);
+            Set<String> groups = this.currentGroups(player);
+            guild.retrieveMemberById(discordUserId)
+                    .queue(member -> this.apply(guild, member, nick, groups), error -> { });
+        });
     }
 
-    private void apply(Guild guild, Member member, UUID player) {
-        String nick = this.expectedNickname(player);
+    /** The mapped groups the player has now, or null when the player is offline (nothing is taken away then). */
+    private Set<String> currentGroups(UUID player) {
+        Player online = this.roles.isEmpty() ? null : Server.getInstance().getPlayer(player).orElse(null);
+        if (online == null) {
+            return null;
+        }
+        Set<String> groups = new HashSet<>();
+        for (String group : this.roles.keySet()) {
+            if (online.hasPermission("group." + group)) {
+                groups.add(group);
+            }
+        }
+        return groups;
+    }
+
+    private void apply(Guild guild, Member member, String nick, Set<String> groups) {
         if (nick != null && !nick.equals(member.getNickname()) && !member.isOwner()
                 && guild.getSelfMember().canInteract(member)) {
             member.modifyNickname(nick).queue(null, error -> { });
         }
 
-        if (this.roles.isEmpty()) {
-            return;
-        }
-        Player online = Server.getInstance().getPlayer(player).orElse(null);
-        if (online == null) {
-            // the groups of a player that is not online cannot be asked, so nothing is taken away
+        if (groups == null) {
             return;
         }
         for (Map.Entry<String, String> mapping : this.roles.entrySet()) {
@@ -146,7 +163,7 @@ public final class MemberSync {
             if (role == null || !guild.getSelfMember().canInteract(role)) {
                 continue;
             }
-            boolean should = online.hasPermission("group." + mapping.getKey());
+            boolean should = groups.contains(mapping.getKey());
             boolean has = member.getRoles().contains(role);
             if (should && !has) {
                 guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(null, error -> { });
@@ -165,11 +182,13 @@ public final class MemberSync {
         if (player == null) {
             return;
         }
-        String nick = this.expectedNickname(player);
-        if (nick != null && !nick.equals(member.getNickname()) && !member.isOwner()
-                && member.getGuild().getSelfMember().canInteract(member)) {
-            member.modifyNickname(nick).queue(null, error -> { });
-        }
+        this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> {
+            String nick = this.expectedNickname(player);
+            if (nick != null && !nick.equals(member.getNickname()) && !member.isOwner()
+                    && member.getGuild().getSelfMember().canInteract(member)) {
+                member.modifyNickname(nick).queue(null, error -> { });
+            }
+        });
     }
 
     /** All the linked accounts, one after the other, spread over the given time so that the rate limits hold. */

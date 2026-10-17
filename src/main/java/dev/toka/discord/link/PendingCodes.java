@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.LongSupplier;
@@ -69,7 +70,7 @@ public final class PendingCodes {
 
     private static String hash(String code) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(code.toUpperCase().getBytes(StandardCharsets.UTF_8));
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(code.toUpperCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
@@ -86,6 +87,10 @@ public final class PendingCodes {
             }
         }
         this.lockedUntil.values().removeIf(until -> until <= now);
+        // failure counters have no expiry of their own; a bound keeps a flood of ids from growing them forever
+        if (this.failures.size() > 10_000) {
+            this.failures.clear();
+        }
     }
 
     /**

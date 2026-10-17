@@ -15,8 +15,6 @@
 # ---------------------------------------------------------------- 指令說明與用法
 cmd:
   discord:
-    # /discord 的簡短說明
-    desc: "§bDiscord 帳號綁定與狀態"
     # 一般玩家的用法（用法錯誤時顯示，後面會接 usageAdmin）
     usage: "§7用法：/discord link [代碼] | unlink | info | help"
     # 管理員（OP 或後台）額外看到的用法，接在 usage 後面
@@ -119,8 +117,8 @@ log:
   noChannelForCommands: "§e沒有聊天頻道，/link 與 /unlink 沒有註冊"
   # ${0}=錯誤訊息
   registerFailed: "§e註冊 /link 指令失敗：${0}"
-  # ${0}=設定欄位名稱（msg-channel-id 或 cmd-channel-id） ${1}=設定的頻道 ID
-  channelNotFound: "§e找不到頻道（${0}）：§a${1}§e；機器人不在該伺服器或無權限看到它。"
+  # ${0}=設定欄位名稱（msg-channel-id 或 cmd-channel-id）
+  channelNotFound: "§e找不到頻道（${0}）；機器人不在該伺服器或無權限看到它。"
   # ${0}=執行者名稱 ${1}=玩家 UUID ${2}=Discord 使用者 ID
   linkedByAdmin: "§b${0} 把 §a${1} §b綁到 Discord §a${2}"
   # ${0}=執行者名稱 ${1}=玩家 UUID

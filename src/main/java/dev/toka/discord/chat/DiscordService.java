@@ -134,7 +134,7 @@ public final class DiscordService implements DiscordLink.Transport {
         }
         TextChannel channel = client.getTextChannelById(id.trim());
         if (channel == null) {
-            this.plugin.getLogger().warning(this.plugin.messages().text("log.channelNotFound", key, id));
+            this.plugin.getLogger().warning(this.plugin.messages().text("log.channelNotFound", key));
         }
         return channel;
     }

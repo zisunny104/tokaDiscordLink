@@ -47,8 +47,9 @@ final class DiscordListener extends ListenerAdapter {
         this.sync.onMemberSeen(member);
 
         String id = member.getId();
-        String name = member.getEffectiveName();
-        String message = event.getMessage().getContentStripped();
+        // a Discord user must not be able to type colour codes into the game chat
+        String name = member.getEffectiveName().replace("§", "");
+        String message = event.getMessage().getContentStripped().replace("§", "");
         String messageId = event.getMessageId();
         if (message.isEmpty()) {
             return;
