@@ -33,12 +33,12 @@
     <dependency>
       <groupId>dev.toka</groupId>
       <artifactId>tokaStorage</artifactId>
-      <version>0.1.3</version>
+      <version>0.1.4</version>
     </dependency>
     <dependency>
       <groupId>dev.toka</groupId>
       <artifactId>tokaI18n</artifactId>
-      <version>0.1.0</version>
+      <version>0.2.2</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
