@@ -9,7 +9,7 @@
 - **暱稱同步**：綁定後，Discord 暱稱會改成遊戲名稱，之後定期更新。
 - **供其他插件使用**：聊天頻道的訊息與指令會轉成事件；其他插件也能透過 API 把訊息送到 Discord。本插件本身不轉送遊戲聊天。
 
-## 玩家怎麼用
+## 玩家指令
 
 | 指令 | 說明 |
 | --- | --- |
@@ -22,7 +22,7 @@
 在 Discord 也可以反過來：輸入 `/link` 取得代碼，再到遊戲輸入 `/discord link <代碼>`；`/unlink` 解除綁定。
 （圖：Discord 中輸入 `/link` 後機器人回覆代碼的畫面）
 
-## 管理員怎麼用
+## 管理指令
 
 | 指令 | 用法 | 說明 | 權限 |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@
 
 初次設定：到 Discord Developer Portal 建立機器人並開啟 Message Content Intent，取得令牌，填入 `token` 與 `msg-channel-id` 後重新啟動。令牌等同密碼，請勿公開。暱稱同步需要機器人有「管理暱稱」權限，且角色高於對方；伺服器擁有者的暱稱無法更改。
 
-## 常用設定（`config.yml`，修改後需重新啟動伺服器）
+## 設定（`config.yml`，變更後需重新啟動）
 
 | key | 預設 | 說明 |
 | --- | --- | --- |
@@ -53,7 +53,7 @@
 | `roles` | 空 | 權限群組對應 Discord 身分組 ID，目前預設不動身分組 |
 | `sync-interval-seconds` | `300` | 暱稱同步間隔，至少 60 |
 
-## 給其他插件的串接
+## 串接
 
 `dev.toka.discord.api.DiscordLink` 的靜態方法；機器人未就緒時呼叫會被忽略，不會出錯。
 
@@ -67,7 +67,7 @@
 | `BotMessageEvent` | `getMsg()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 聊天頻道的一般訊息，可取消 |
 | `BotCommandEvent` | `getCommand()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 帶前綴的指令；處理後呼叫 `setHandled(true)`，否則回覆未知指令 |
 
-## 常見問題
+## 疑難排解
 
 - **機器人沒有上線？** 確認 `token` 與 `msg-channel-id` 已填，且已開啟 Message Content Intent。
 - **暱稱沒有變？** 檢查機器人是否有「管理暱稱」權限，且角色比對方高。
