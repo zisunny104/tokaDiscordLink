@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.toka</groupId>
   <artifactId>tokaDiscordLink</artifactId>
-  <version>0.1.6</version>
+  <version>0.2.0</version>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
@@ -34,6 +34,11 @@
       <groupId>dev.toka</groupId>
       <artifactId>tokaStorage</artifactId>
       <version>0.1.3</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.toka</groupId>
+      <artifactId>tokaI18n</artifactId>
+      <version>0.1.0</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -119,6 +124,10 @@
                 <relocation>
                   <pattern>dev.toka.storage</pattern>
                   <shadedPattern>dev.toka.discord.internal.storage</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>dev.toka.i18n</pattern>
+                  <shadedPattern>dev.toka.discord.internal.i18n</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>org.yaml.snakeyaml</pattern>

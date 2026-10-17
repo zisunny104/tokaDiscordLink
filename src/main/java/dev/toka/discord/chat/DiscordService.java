@@ -56,7 +56,7 @@ public final class DiscordService implements DiscordLink.Transport {
 
     public String describeChannel(String channel) {
         TextChannel textChannel = channel.equals(DiscordLink.CMD_CHANNEL) ? this.cmdChannel : this.msgChannel;
-        return textChannel == null ? "（未設定或找不到）" : "#" + textChannel.getName();
+        return textChannel == null ? this.plugin.messages().text("status.channelMissing") : "#" + textChannel.getName();
     }
 
     /** Connects in the background, so that the server does not wait for Discord. */
@@ -100,17 +100,18 @@ public final class DiscordService implements DiscordLink.Transport {
             this.registerLinkCommands(client, config);
             this.ready = true;
             this.sendEmbed(config.getString("bot-start-msg", ""), config.getString("bot-start-color", ""), DiscordLink.MSG_CHANNEL);
-            this.plugin.getLogger().info("Discord 已連線：" + client.getSelfUser().getName());
+            this.plugin.getLogger().info(this.plugin.messages().text("log.connected", client.getSelfUser().getName()));
         } catch (Exception | LinkageError e) {
             this.ready = false;
-            this.failure = e.getClass().getSimpleName() + (e.getMessage() == null ? "" : "：" + e.getMessage());
+            this.failure = e.getMessage() == null ? e.getClass().getSimpleName()
+                    : this.plugin.messages().text("status.failure", e.getClass().getSimpleName(), e.getMessage());
             JDA client = this.jda;
             if (client != null) {
                 client.shutdownNow();
             }
             String hint = this.failure.contains("ntent")
-                    ? "（請到 Discord Developer Portal 的 Bot 頁面，開啟 Message Content Intent）" : "";
-            this.plugin.getLogger().warning("Discord 未就緒：" + this.failure + hint);
+                    ? this.plugin.messages().text("status.intentHint") : "";
+            this.plugin.getLogger().warning(this.plugin.messages().text("log.notReady", this.failure, hint));
         }
     }
 
@@ -118,13 +119,13 @@ public final class DiscordService implements DiscordLink.Transport {
     private void registerLinkCommands(JDA client, Config config) {
         TextChannel channel = this.msgChannel;
         if (channel == null) {
-            this.plugin.getLogger().warning("沒有聊天頻道，/link 與 /unlink 沒有註冊");
+            this.plugin.getLogger().warning(this.plugin.messages().text("log.noChannelForCommands"));
             return;
         }
         this.sync.attach(client, channel.getGuild().getId());
-        client.addEventListener(new LinkCommands(this.links, this.sync, config.getInt("link.code-ttl-seconds", 600)));
-        channel.getGuild().updateCommands().addCommands(LinkCommands.definitions())
-                .queue(null, error -> this.plugin.getLogger().warning("註冊 /link 指令失敗：" + error.getMessage()));
+        client.addEventListener(new LinkCommands(this.plugin.messages(), this.links, this.sync, config.getInt("link.code-ttl-seconds", 600)));
+        channel.getGuild().updateCommands().addCommands(LinkCommands.definitions(this.plugin.messages()))
+                .queue(null, error -> this.plugin.getLogger().warning(this.plugin.messages().text("log.registerFailed", error.getMessage())));
     }
 
     private TextChannel find(JDA client, String id, String key) {
@@ -133,7 +134,7 @@ public final class DiscordService implements DiscordLink.Transport {
         }
         TextChannel channel = client.getTextChannelById(id.trim());
         if (channel == null) {
-            this.plugin.getLogger().warning("找不到頻道（" + key + "）：" + id + "。請確認機器人在那個伺服器，且有權限看到它。");
+            this.plugin.getLogger().warning(this.plugin.messages().text("log.channelNotFound", key, id));
         }
         return channel;
     }

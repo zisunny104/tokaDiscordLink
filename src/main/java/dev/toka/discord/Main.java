@@ -15,6 +15,7 @@ import dev.toka.discord.chat.DiscordService;
 import dev.toka.discord.link.LinkService;
 import dev.toka.discord.link.MemberSync;
 import dev.toka.discord.link.PendingCodes;
+import dev.toka.i18n.Messages;
 import dev.toka.storage.Backend;
 import dev.toka.storage.DocumentStore;
 import dev.toka.storage.StoreConfig;
@@ -32,6 +33,12 @@ public final class Main extends PluginBase implements Listener {
     private MemberSync sync;
     private DiscordService service;
     private String disabledReason;
+    private Messages messages;
+
+    /** The texts of the plugin, in the language of {@code language} in config.yml. */
+    public Messages messages() {
+        return this.messages;
+    }
 
     /**
      * The links are kept in plugins/tokaDiscordLink/storage/sqlite/ like the other plugins. The folder links/ of an
@@ -61,10 +68,10 @@ public final class Main extends PluginBase implements Listener {
                 }
             }
             java.nio.file.Files.move(staging, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-            this.getLogger().info("§a綁定資料已從 links 複製到 storage/sqlite，舊的 links 資料夾保留不刪");
+            this.getLogger().info(this.messages.text("log.storageCopied"));
             return target;
         } catch (java.io.IOException | RuntimeException error) {
-            this.getLogger().warning("§e無法把綁定資料複製到 storage/sqlite，繼續使用舊的 links 資料夾：" + error.getMessage());
+            this.getLogger().warning(this.messages.text("log.storageCopyFailed", error.getMessage()));
             try (var leftover = java.nio.file.Files.walk(staging)) {
                 for (Path file : (Iterable<Path>) leftover.sorted(java.util.Comparator.reverseOrder())::iterator) {
                     java.nio.file.Files.deleteIfExists(file);
@@ -79,6 +86,8 @@ public final class Main extends PluginBase implements Listener {
     @Override
     public void onEnable() {
         this.saveDefaultConfig();
+        this.messages = new Messages(this.getClass().getClassLoader(), this.getDataFolder().toPath(),
+                this.getConfig().getString("language", "zh-TW"), line -> this.getLogger().warning(line));
 
         try {
             Backend backend = Backend.valueOf(this.getConfig().getString("storage.backend", "sqlite").toUpperCase(Locale.ROOT));
@@ -89,10 +98,10 @@ public final class Main extends PluginBase implements Listener {
                     this.getConfig().getInt("link.max-attempts", 5),
                     this.getConfig().getInt("link.lockout-seconds", 600));
             this.links = new LinkService(store, System::currentTimeMillis, codes);
-            this.getLogger().info("§b載入綁定共 §a" + this.links.count() + " §b個");
+            this.getLogger().info(this.messages.text("log.linksLoaded", this.links.count()));
         } catch (Exception e) {
-            this.getLogger().error("綁定資料無法開啟，Discord 串聯停用，原資料沒有被更動", e);
-            this.disabledReason = "綁定資料無法開啟：" + e.getMessage();
+            this.getLogger().error(this.messages.text("log.storageOpenFailed"), e);
+            this.disabledReason = this.messages.text("status.reason.storage", e.getMessage());
             return;
         }
         DiscordLink.setIdentityResolver(this.links);
@@ -117,15 +126,15 @@ public final class Main extends PluginBase implements Listener {
         Plugin one = this.getServer().getPluginManager().getPlugin("one");
         if (one != null && one.isEnabled()) {
             // Two bots with the same token would answer every message twice
-            this.disabledReason = "舊的 one 插件還在執行，請先移除 one，再啟用本插件";
+            this.disabledReason = this.messages.text("status.reason.onePlugin");
         } else if (this.getConfig().getString("token", "").isBlank()) {
-            this.disabledReason = "config.yml 的 token 還沒有設定";
+            this.disabledReason = this.messages.text("status.reason.noToken");
         } else if (this.getConfig().getString("msg-channel-id", "").isBlank()) {
-            this.disabledReason = "config.yml 的 msg-channel-id 還沒有設定";
+            this.disabledReason = this.messages.text("status.reason.noMsgChannel");
         }
 
         if (this.disabledReason != null) {
-            this.getLogger().warning("Discord 串聯停用：" + this.disabledReason);
+            this.getLogger().warning(this.messages.text("log.disabled", this.disabledReason));
             return;
         }
 
@@ -153,7 +162,7 @@ public final class Main extends PluginBase implements Listener {
             try {
                 this.links.close();
             } catch (Exception e) {
-                this.getLogger().warning("綁定資料關閉時發生錯誤：" + e.getMessage());
+                this.getLogger().warning(this.messages.text("log.linksCloseFailed", e.getMessage()));
             }
         }
     }
@@ -173,15 +182,25 @@ public final class Main extends PluginBase implements Listener {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "info" : args[0].toLowerCase(Locale.ROOT);
         boolean admin = sender.hasPermission(PERMISSION_ADMIN) || !(sender instanceof Player);
-        if (this.links == null && !sub.equals("status")) {
-            sender.sendMessage("綁定功能目前不能使用：" + this.disabledReason);
+        if (this.links == null && !sub.equals("status") && !sub.equals("help")) {
+            sender.sendMessage(this.messages.text("err.bindingUnavailable", this.disabledReason));
             return true;
         }
 
         switch (sub) {
+            case "help":
+                for (String line : this.messages.lines("help.discord")) {
+                    sender.sendMessage(line);
+                }
+                if (admin) {
+                    for (String line : this.messages.lines("help.discordAdmin")) {
+                        sender.sendMessage(line);
+                    }
+                }
+                return true;
             case "status":
                 if (!admin) {
-                    sender.sendMessage("您沒有權限查看狀態。");
+                    sender.sendMessage(this.messages.text("err.noPermissionStatus"));
                     return true;
                 }
                 this.status(sender);
@@ -196,8 +215,8 @@ public final class Main extends PluginBase implements Listener {
                 this.info(sender, args, admin);
                 return true;
             default:
-                sender.sendMessage("用法：/discord link [代碼] | unlink | info"
-                        + (admin ? " | status | link <玩家> <Discord使用者ID> | unlink <玩家> | info <玩家>" : ""));
+                sender.sendMessage(this.messages.text("cmd.discord.usage")
+                        + (admin ? this.messages.text("cmd.discord.usageAdmin") : ""));
                 return true;
         }
     }
@@ -205,33 +224,33 @@ public final class Main extends PluginBase implements Listener {
     private void status(CommandSender sender) {
         String state;
         if (this.service == null) {
-            state = "停用（" + this.disabledReason + "）";
+            state = this.messages.text("status.disabled", this.disabledReason);
         } else if (this.service.isReady()) {
-            state = "就緒";
+            state = this.messages.text("status.ready");
         } else if (this.service.getFailure() != null) {
-            state = "未就緒（" + this.service.getFailure() + "）";
+            state = this.messages.text("status.notReady", this.service.getFailure());
         } else {
-            state = "連線中";
+            state = this.messages.text("status.connecting");
         }
-        sender.sendMessage("Discord：" + state);
+        sender.sendMessage(this.messages.text("msg.status.discord", state));
         if (this.service != null && this.service.isReady()) {
-            sender.sendMessage("聊天頻道：" + this.service.describeChannel(DiscordLink.MSG_CHANNEL));
-            sender.sendMessage("指令結果頻道：" + this.service.describeChannel(DiscordLink.CMD_CHANNEL));
+            sender.sendMessage(this.messages.text("msg.status.msgChannel", this.service.describeChannel(DiscordLink.MSG_CHANNEL)));
+            sender.sendMessage(this.messages.text("msg.status.cmdChannel", this.service.describeChannel(DiscordLink.CMD_CHANNEL)));
         }
         if (this.links != null) {
-            sender.sendMessage("已綁定帳號：" + this.links.count() + " 個");
-            sender.sendMessage("暱稱管理：" + this.sync.nicknameMode().name().toLowerCase(Locale.ROOT)
-                    + "；身分組對照：" + this.sync.roleMappings() + " 項"
-                    + (this.sync.roleMappings() == 0 ? "（空的，不會更動任何身分組）" : ""));
+            sender.sendMessage(this.messages.text("msg.status.linked", this.links.count()));
+            sender.sendMessage(this.messages.text("msg.status.nickname", this.sync.nicknameMode().name().toLowerCase(Locale.ROOT),
+                    this.sync.roleMappings(),
+                    this.sync.roleMappings() == 0 ? this.messages.text("status.rolesEmpty") : ""));
         }
-        sender.sendMessage("權限串接：等待中（目前管理操作只認 OP；新的權限組確定後再接）");
+        sender.sendMessage(this.messages.text("msg.status.permission"));
     }
 
     private void link(CommandSender sender, String[] args, boolean admin) {
         if (args.length == 3) {
             // /discord link <player> <Discord user id>: only for operators
             if (!admin) {
-                sender.sendMessage("替別人綁定需要 OP 權限。");
+                sender.sendMessage(this.messages.text("err.needOpLink"));
                 return;
             }
             UUID target = this.resolve(sender, args[1]);
@@ -240,35 +259,35 @@ public final class Main extends PluginBase implements Listener {
             }
             String discordId = args[2].trim();
             if (!discordId.matches("\\d{15,25}")) {
-                sender.sendMessage("Discord 使用者 ID 是一串數字，請在 Discord 開啟開發者模式後，對使用者按右鍵複製 ID。");
+                sender.sendMessage(this.messages.text("err.invalidDiscordId"));
                 return;
             }
             LinkService.Result result = this.links.link(target, discordId);
             sender.sendMessage(this.describe(result, target));
             if (result == LinkService.Result.LINKED) {
-                this.getLogger().info("[綁定] " + sender.getName() + " 把 " + target + " 綁到 Discord " + discordId);
+                this.getLogger().info(this.messages.text("log.linkedByAdmin", sender.getName(), target, discordId));
                 this.sync.sync(target, discordId);
             }
             return;
         }
 
         if (!(sender instanceof Player)) {
-            sender.sendMessage("用法：/discord link <玩家> <Discord使用者ID>");
+            sender.sendMessage(this.messages.text("msg.link.usageConsole"));
             return;
         }
         Player player = (Player) sender;
         UUID uuid = player.getUniqueId();
         if (args.length == 1) {
             if (this.links.discordUserOf(uuid).isPresent()) {
-                sender.sendMessage("您已經綁定 Discord 帳號了。要換的話，先輸入 /discord unlink。");
+                sender.sendMessage(this.messages.text("msg.link.alreadyLinked"));
                 return;
             }
             String code = this.links.codes().issue(PendingCodes.Side.GAME, uuid.toString());
             int minutes = Math.max(1, this.getConfig().getInt("link.code-ttl-seconds", 600) / 60);
-            sender.sendMessage("您的綁定代碼：" + code + "（" + minutes + " 分鐘內有效，只能用一次）");
-            sender.sendMessage("請到 Discord 輸入：/link code:" + code + "　不要把代碼給任何人。");
+            sender.sendMessage(this.messages.text("msg.link.code", code, minutes));
+            sender.sendMessage(this.messages.text("msg.link.codeHint", code));
             if (this.service == null || !this.service.isReady()) {
-                sender.sendMessage("注意：Discord 機器人目前沒有就緒，請稍後再到 Discord 輸入。");
+                sender.sendMessage(this.messages.text("msg.link.botNotReady"));
             }
             return;
         }
@@ -276,10 +295,10 @@ public final class Main extends PluginBase implements Listener {
             LinkService.Confirmation result = this.links.confirm(PendingCodes.Side.GAME, uuid.toString(), args[1]);
             switch (result.outcome()) {
                 case LOCKED:
-                    sender.sendMessage("輸入錯誤太多次，請稍後再試。");
+                    sender.sendMessage(this.messages.text("err.codeLocked"));
                     return;
                 case WRONG_OR_EXPIRED:
-                    sender.sendMessage("代碼不正確或已經過期。請在 Discord 輸入 /link 取得新的代碼。");
+                    sender.sendMessage(this.messages.text("err.codeWrong"));
                     return;
                 default:
                     sender.sendMessage(this.describe(result.result(), result.match().player()));
@@ -289,14 +308,14 @@ public final class Main extends PluginBase implements Listener {
                     return;
             }
         }
-        sender.sendMessage("用法：/discord link（產生代碼）或 /discord link <Discord 給您的代碼>");
+        sender.sendMessage(this.messages.text("msg.link.usage"));
     }
 
     private void unlink(CommandSender sender, String[] args, boolean admin) {
         UUID target;
         if (args.length >= 2) {
             if (!admin) {
-                sender.sendMessage("替別人解除綁定需要 OP 權限。");
+                sender.sendMessage(this.messages.text("err.needOpUnlink"));
                 return;
             }
             target = this.resolve(sender, args[1]);
@@ -306,16 +325,16 @@ public final class Main extends PluginBase implements Listener {
         } else if (sender instanceof Player) {
             target = ((Player) sender).getUniqueId();
         } else {
-            sender.sendMessage("用法：/discord unlink <玩家>");
+            sender.sendMessage(this.messages.text("msg.unlink.usageConsole"));
             return;
         }
         if (this.links.unlinkPlayer(target)) {
-            sender.sendMessage("已解除綁定。要再綁定需要重新驗證。");
+            sender.sendMessage(this.messages.text("msg.unlink.done"));
             if (args.length >= 2) {
-                this.getLogger().info("[綁定] " + sender.getName() + " 解除了 " + target + " 的綁定");
+                this.getLogger().info(this.messages.text("log.unlinkedByAdmin", sender.getName(), target));
             }
         } else {
-            sender.sendMessage("沒有可以解除的綁定。");
+            sender.sendMessage(this.messages.text("err.unlinkNone"));
         }
     }
 
@@ -323,7 +342,7 @@ public final class Main extends PluginBase implements Listener {
         UUID target;
         if (args.length >= 2) {
             if (!admin) {
-                sender.sendMessage("查看別人的綁定需要 OP 權限。");
+                sender.sendMessage(this.messages.text("err.needOpInfo"));
                 return;
             }
             target = this.resolve(sender, args[1]);
@@ -333,11 +352,11 @@ public final class Main extends PluginBase implements Listener {
         } else if (sender instanceof Player) {
             target = ((Player) sender).getUniqueId();
         } else {
-            sender.sendMessage("用法：/discord info <玩家>");
+            sender.sendMessage(this.messages.text("msg.info.usageConsole"));
             return;
         }
         String discord = this.links.discordUserOf(target).orElse(null);
-        sender.sendMessage(discord == null ? "尚未綁定 Discord。輸入 /discord link 開始。" : "已綁定 Discord 使用者 ID：" + discord);
+        sender.sendMessage(discord == null ? this.messages.text("msg.info.notLinked") : this.messages.text("msg.info.linked", discord));
     }
 
     /** A player name to the UUID, with the reason when there is none. */
@@ -348,7 +367,7 @@ public final class Main extends PluginBase implements Listener {
         }
         IPlayer offline = Server.getInstance().getOfflinePlayer(name);
         if (offline == null || offline.getUniqueId() == null || !offline.hasPlayedBefore()) {
-            sender.sendMessage("找不到玩家「" + name + "」，對方需要進過伺服器。");
+            sender.sendMessage(this.messages.text("err.playerNotFound", name));
             return null;
         }
         return offline.getUniqueId();
@@ -358,15 +377,15 @@ public final class Main extends PluginBase implements Listener {
         String name = Server.getInstance().getOfflinePlayer(player).getName();
         switch (result) {
             case LINKED:
-                return "綁定完成：" + (name == null ? player : name);
+                return this.messages.text("msg.link.done", name == null ? player : name);
             case ALREADY_LINKED:
-                return "這兩個帳號早就綁定在一起了。";
+                return this.messages.text("msg.link.already");
             case PLAYER_HAS_OTHER:
-                return "這個遊戲帳號已經綁定了另一個 Discord 帳號。要換的話，先 /discord unlink。";
+                return this.messages.text("err.link.playerHasOther");
             case DISCORD_HAS_OTHER:
-                return "這個 Discord 帳號已經綁定了另一個遊戲帳號。要換的話，先到 Discord 輸入 /unlink。";
+                return this.messages.text("err.link.discordHasOther");
             default:
-                return "綁定沒有儲存成功，請稍後再試，並通知管理員。";
+                return this.messages.text("err.link.saveFailed");
         }
     }
 }

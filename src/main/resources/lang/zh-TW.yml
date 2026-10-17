@@ -1,0 +1,180 @@
+# tokaDiscordLink 繁體中文語系檔（zh-TW）
+#
+# 用途：插件裡所有「使用者看得到的文字」都放在這裡（遊戲內訊息、後台日誌、Discord 斜線指令說明與回覆、/discord help）。
+# 伺服器擁有者可把同名檔放進 plugins/tokaDiscordLink/lang/zh-TW.yml，只寫要覆蓋的 key；沒寫到的仍用 jar 內的文字。
+# 語言由 config.yml 的 language 決定。
+#
+# 寫法：
+#   ${0}、${1}… 是參數的位置（從 0 開始），每個 key 上方註解會說明各參數的意義與順序；參數只會被替換一次。
+#   § 色碼：§b 一般文字、§a 數字／名稱／成功、§e 警告、§c 錯誤、§7 用法與次要說明、§6 標題。
+#   送到 Discord 的文字（discord.* 區）不使用 § 色碼，Discord 只認 Markdown（**粗體**）。
+#   後台日誌（log.*）不加方括號標籤，行首直接寫文字。
+#   config.yml 裡管理員可自訂的文字（開關服提示、未知指令回覆、狀態文字）維持在 config.yml，不在這裡。
+#   指令名稱、權限節點、config 欄位、Discord 斜線指令名稱（link、unlink）與參數名稱（code）不翻譯。
+
+# ---------------------------------------------------------------- 指令說明與用法
+cmd:
+  discord:
+    # /discord 的簡短說明
+    desc: "§bDiscord 帳號綁定與狀態"
+    # 一般玩家的用法（用法錯誤時顯示，後面會接 usageAdmin）
+    usage: "§7用法：/discord link [代碼] | unlink | info | help"
+    # 管理員（OP 或後台）額外看到的用法，接在 usage 後面
+    usageAdmin: " | status | link <玩家> <Discord使用者ID> | unlink <玩家> | info <玩家>"
+
+# ---------------------------------------------------------------- /discord help（第一行是標題）
+help:
+  # 所有人看得到的說明
+  discord:
+    - "§6§l/discord 說明"
+    - "§e/discord help §7- §b顯示這份說明"
+    - "§e/discord info §7- §b查看自己的綁定（等同 /discord）"
+    - "§e/discord link §7- §b產生綁定代碼，到 Discord 輸入 /link code:代碼 完成綁定"
+    - "§e/discord link <代碼> §7- §b輸入 Discord 的 /link 給您的代碼完成綁定"
+    - "§e/discord unlink §7- §b解除自己的綁定"
+  # 管理員（OP 或後台）另外看到的說明
+  discordAdmin:
+    - "§e/discord status §7- §b查看機器人連線、頻道與綁定狀態"
+    - "§e/discord link <玩家> <Discord使用者ID> §7- §b替玩家直接綁定（玩家需進過伺服器）"
+    - "§e/discord unlink <玩家> §7- §b解除玩家的綁定"
+    - "§e/discord info <玩家> §7- §b查看玩家綁定的 Discord 使用者 ID"
+
+# ---------------------------------------------------------------- 遊戲內訊息
+msg:
+  link:
+    # 用法（玩家）
+    usage: "§7用法：/discord link（產生代碼）或 /discord link <Discord 給您的代碼>"
+    # 用法（後台）
+    usageConsole: "§7用法：/discord link <玩家> <Discord使用者ID>"
+    # 已經綁定，不能再產生代碼
+    alreadyLinked: "§b您已經綁定 Discord 帳號了。要換的話，先輸入 §a/discord unlink§b。"
+    # 產生代碼 ${0}=代碼 ${1}=有效分鐘數
+    code: "§b您的綁定代碼：§a${0}§b（§a${1} §b分鐘內有效，只能用一次）"
+    # 產生代碼的提示 ${0}=代碼
+    codeHint: "§b請到 Discord 輸入：§a/link code:${0}§b　不要把代碼給任何人。"
+    # Discord 機器人還沒就緒時的提醒
+    botNotReady: "§e注意：Discord 機器人目前沒有就緒，請稍後再到 Discord 輸入。"
+    # 綁定完成 ${0}=玩家名稱（查不到名稱時是 UUID）
+    done: "§a綁定完成：${0}"
+    # 這兩個帳號本來就綁在一起
+    already: "§b這兩個帳號早就綁定在一起了。"
+  unlink:
+    usageConsole: "§7用法：/discord unlink <玩家>"
+    done: "§a已解除綁定。要再綁定需要重新驗證。"
+  info:
+    usageConsole: "§7用法：/discord info <玩家>"
+    notLinked: "§b尚未綁定 Discord。輸入 §a/discord link§b 開始。"
+    # ${0}=Discord 使用者 ID
+    linked: "§b已綁定 Discord 使用者 ID：§a${0}"
+  # /discord status 的各行
+  status:
+    # ${0}=狀態字（見 status.ready 等）
+    discord: "§bDiscord：§a${0}"
+    # ${0}=頻道名稱（#名稱）或 status.channelMissing
+    msgChannel: "§b聊天頻道：§a${0}"
+    # ${0}=頻道名稱或 status.channelMissing
+    cmdChannel: "§b指令結果頻道：§a${0}"
+    # ${0}=已綁定帳號數
+    linked: "§b已綁定帳號：§a${0} §b個"
+    # ${0}=暱稱管理模式代碼（off／set／enforce，設定值不翻譯） ${1}=身分組對照項數 ${2}=空的時候的補充（status.rolesEmpty）或空字串
+    nickname: "§b暱稱管理：§a${0}§b；身分組對照：§a${1} §b項${2}"
+    permission: "§7權限串接：等待中（目前管理操作只認 OP；新的權限組確定後再接）"
+
+# ---------------------------------------------------------------- 錯誤與拒絕
+err:
+  # ${0}=停用原因（見 status.reason.*）
+  bindingUnavailable: "§c綁定功能目前不能使用：${0}"
+  noPermissionStatus: "§c您沒有權限查看狀態。"
+  needOpLink: "§c替別人綁定需要 OP 權限。"
+  needOpUnlink: "§c替別人解除綁定需要 OP 權限。"
+  needOpInfo: "§c查看別人的綁定需要 OP 權限。"
+  invalidDiscordId: "§cDiscord 使用者 ID 是一串數字，請在 Discord 開啟開發者模式後，對使用者按右鍵複製 ID。"
+  # ${0}=輸入的玩家名稱
+  playerNotFound: "§c找不到玩家「§a${0}§c」，對方需要進過伺服器。"
+  codeLocked: "§c輸入錯誤太多次，請稍後再試。"
+  codeWrong: "§c代碼不正確或已經過期。請在 Discord 輸入 /link 取得新的代碼。"
+  unlinkNone: "§c沒有可以解除的綁定。"
+  link:
+    playerHasOther: "§c這個遊戲帳號已經綁定了另一個 Discord 帳號。要換的話，先 /discord unlink。"
+    discordHasOther: "§c這個 Discord 帳號已經綁定了另一個遊戲帳號。要換的話，先到 Discord 輸入 /unlink。"
+    saveFailed: "§c綁定沒有儲存成功，請稍後再試，並通知管理員。"
+
+# ---------------------------------------------------------------- 後台日誌（不加方括號標籤，文字 §b、數字 §a、警告 §e、成功 §a）
+log:
+  # ${0}=綁定數量
+  linksLoaded: "§b載入綁定共 §a${0} §b個"
+  storageCopied: "§a綁定資料已從 links 複製到 storage/sqlite，舊的 links 資料夾保留不刪"
+  # ${0}=錯誤訊息
+  storageCopyFailed: "§e無法把綁定資料複製到 storage/sqlite，繼續使用舊的 links 資料夾：${0}"
+  storageOpenFailed: "§c綁定資料無法開啟，Discord 串聯停用，原資料沒有被更動"
+  # ${0}=錯誤訊息
+  linksCloseFailed: "§e綁定資料關閉時發生錯誤：${0}"
+  # ${0}=停用原因（見 status.reason.*）
+  disabled: "§eDiscord 串聯停用：${0}"
+  # ${0}=機器人名稱
+  connected: "§aDiscord 已連線：${0}"
+  # ${0}=失敗原因 ${1}=提示（status.intentHint）或空字串
+  notReady: "§eDiscord 未就緒：${0}${1}"
+  noChannelForCommands: "§e沒有聊天頻道，/link 與 /unlink 沒有註冊"
+  # ${0}=錯誤訊息
+  registerFailed: "§e註冊 /link 指令失敗：${0}"
+  # ${0}=設定欄位名稱（msg-channel-id 或 cmd-channel-id） ${1}=設定的頻道 ID
+  channelNotFound: "§e找不到頻道（${0}）：§a${1}§e。請確認機器人在那個伺服器，且有權限看到它。"
+  # ${0}=執行者名稱 ${1}=玩家 UUID ${2}=Discord 使用者 ID
+  linkedByAdmin: "§b${0} 把 §a${1} §b綁到 Discord §a${2}"
+  # ${0}=執行者名稱 ${1}=玩家 UUID
+  unlinkedByAdmin: "§b${0} 解除了 §a${1} §b的綁定"
+
+# ---------------------------------------------------------------- 狀態字與原因（會被嵌進其他訊息，不含色碼）
+status:
+  ready: "就緒"
+  connecting: "連線中"
+  # ${0}=停用原因（見 reason.*）
+  disabled: "停用（${0}）"
+  # ${0}=失敗原因（見 status.failure）
+  notReady: "未就緒（${0}）"
+  # 沒有設定頻道或找不到頻道
+  channelMissing: "（未設定或找不到）"
+  # 暱稱身分組對照為 0 項時接在後面
+  rolesEmpty: "（空的，不會更動任何身分組）"
+  # 連線失敗原因 ${0}=例外類別名稱 ${1}=錯誤訊息
+  failure: "${0}：${1}"
+  # 疑似沒開 Message Content Intent 時接在失敗原因後面
+  intentHint: "（請到 Discord Developer Portal 的 Bot 頁面，開啟 Message Content Intent）"
+  # Discord 串聯停用的原因
+  reason:
+    # ${0}=錯誤訊息
+    storage: "綁定資料無法開啟：${0}"
+    onePlugin: "舊的 one 插件還在執行，請先移除 one，再啟用本插件"
+    noToken: "config.yml 的 token 還沒有設定"
+    noMsgChannel: "config.yml 的 msg-channel-id 還沒有設定"
+
+# ---------------------------------------------------------------- 送到 Discord 的文字（不使用 § 色碼）
+discord:
+  # Discord 斜線指令的說明（指令名稱 link、unlink 與參數名稱 code 不翻譯）
+  cmd:
+    link:
+      desc: "把你的 Discord 帳號綁定到遊戲帳號"
+      # 參數 code 的說明
+      code: "遊戲裡產生的代碼；不填就產生一個給遊戲輸入的代碼"
+    unlink:
+      desc: "解除你的 Discord 帳號與遊戲帳號的綁定"
+  unlinked: "已解除綁定。要再綁定需要重新驗證。"
+  notLinked: "你目前沒有綁定任何遊戲帳號。"
+  # ${0}=遊戲玩家名稱
+  alreadyLinked: "你已經綁定遊戲帳號：${0}。要換的話請先 /unlink。"
+  # 產生代碼（三行） ${0}=代碼 ${1}=有效分鐘數
+  codeIssued:
+    - "你的綁定代碼：**${0}**（${1} 分鐘內有效，只能用一次）。"
+    - "請在遊戲裡輸入：/discord link ${0}"
+    - "不要把代碼給任何人。"
+  locked: "輸入錯誤太多次，請稍後再試。"
+  wrongCode: "代碼不正確或已經過期。請在遊戲裡重新輸入 /discord link 取得新的代碼。"
+  # ${0}=遊戲玩家名稱
+  linked: "綁定完成：${0}"
+  already: "這兩個帳號早就綁定在一起了。"
+  playerHasOther: "這個遊戲帳號已經綁定了另一個 Discord 帳號。要換的話，先在遊戲輸入 /discord unlink。"
+  discordHasOther: "這個 Discord 帳號已經綁定了另一個遊戲帳號。要換的話，先 /unlink。"
+  saveFailed: "綁定沒有儲存成功，請稍後再試，並通知管理員。"
+  # config.yml 的 unknown-command-msg 欄位不存在時的預設（沒有 ${n} 參數；%name 是發話者名稱，%msg 是整段指令，由插件替換）
+  unknownCommand: "`%name`不明的指令:%msg"

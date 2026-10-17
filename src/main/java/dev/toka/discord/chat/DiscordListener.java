@@ -27,7 +27,7 @@ final class DiscordListener extends ListenerAdapter {
         this.service = service;
         this.sync = sync;
         this.prefix = config.getString("discord-command-prefix", "/");
-        this.unknownCommand = config.getString("unknown-command-msg", "`%name`不明的指令:%msg");
+        this.unknownCommand = config.getString("unknown-command-msg", plugin.messages().text("discord.unknownCommand"));
     }
 
     @Override

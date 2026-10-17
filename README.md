@@ -4,7 +4,7 @@
 
 遊戲與 Discord 之間的串聯，給 Nukkit 伺服器使用。負責機器人連線、聊天訊息與指令的收發、遊戲與 Discord 帳號的一對一綁定，以及綁定後的暱稱同步。它**不認識 zero**，也不依賴其他遊戲插件，其他插件透過 `DiscordLink` API 與事件使用它。
 
-它取代舊的 `one` 插件的「機器人」部分。目前版本 0.1.4（把 JDA 的日誌轉到伺服器日誌，不再出現「缺少 SLF4J 實作」的警告）。
+它取代舊的 `one` 插件的「機器人」部分。目前版本 0.2.0（所有文字抽到多語系檔，新增 `/discord help`）。
 
 ## 功能
 - 機器人連線、聊天頻道與指令結果頻道的訊息收發、開關服提示。
@@ -21,7 +21,7 @@
 - 機器人要在你的 Discord 伺服器裡，而且看得到、能發言於你設定的頻道。要同步暱稱需要「管理暱稱」權限，且機器人的角色要比對方的最高角色高；伺服器擁有者的暱稱改不了。
 
 ## 安裝
-1. 把 `tokaDiscordLink-0.1.4.jar` 放進伺服器的 `plugins/`。
+1. 把 `tokaDiscordLink-0.2.0.jar` 放進伺服器的 `plugins/`。
 2. 第一次啟動後會產生 `plugins/tokaDiscordLink/config.yml`，填入 `token`、`msg-channel-id`。
 3. 重開伺服器。`token` 或 `msg-channel-id` 沒填時，插件會停用 Discord，並在日誌說明原因，不影響伺服器。
 
@@ -42,8 +42,11 @@
 | `roles` | 遊戲權限群組對應 Discord 身分組 ID，預設空，空的時候不會動任何身分組 |
 | `sync-interval-seconds` | 暱稱與身分組的定期同步間隔，至少 60 |
 
+## 多語系
+所有玩家看得到的文字、後台日誌與 Discord 回覆都放在共用套件 [tokaI18n](https://github.com/zisunny104/tokaI18n)（內嵌進 jar）的語系檔 `lang/zh-TW.yml`，目前只有繁體中文。語言由 `config.yml` 的 `language` 決定；想改個別文字，把同名檔放進 `plugins/tokaDiscordLink/lang/`，只寫要覆蓋的 key。開關服提示、未知指令回覆等管理員自訂的文字仍在 `config.yml`。詳見 [`docs/I18N.md`](docs/I18N.md)。
+
 ## 指令與權限
-遊戲內 `/discord [link [代碼] | unlink | info | status]`，Discord 內 `/link [code]` 與 `/unlink`（回覆只有你看得到）。
+遊戲內 `/discord [link [代碼] | unlink | info | status | help]`，Discord 內 `/link [code]` 與 `/unlink`（回覆只有你看得到）。
 
 | 權限 | 說明 | 預設 |
 |---|---|---|

@@ -1,41 +1,54 @@
 # tokaDiscordLink 設定檔
 # 欄位名稱與舊的 one 插件相同，舊設定可以直接把 token、頻道 ID、狀態與提示文字複製過來。
 # 修改後需要重開伺服器（或停用再啟用插件）才會套用。
+# 本檔不要用會洗掉註解的方式改寫；請直接編輯文字。
+
+# 語言。目前提供 zh-TW（繁體中文）。插件的訊息放在 jar 內的 lang/zh-TW.yml；
+# 想改個別文字，把同名檔放進 plugins/tokaDiscordLink/lang/，只寫要覆蓋的項目即可。
+language: zh-TW
 
 # 設定檔格式版本，請不要修改
 config-version: 1
 
 # 機器人令牌（Token）。留空代表停用串聯，不會嘗試連線。
 # 令牌等同密碼，請不要貼到聊天室、截圖或提交到 Git。
+# 填法：到 Discord Developer Portal 的 Bot 頁面取得令牌，用雙引號包起來貼在這裡。
+# 同時請在該頁面開啟 Message Content Intent，否則機器人連不上。
 token: ""
 
 # 遊戲聊天串聯的頻道 ID（文字頻道）。聊天訊息與 Discord 指令都在這個頻道。
+# 填法：Discord 開啟開發者模式後，對頻道按右鍵「複製頻道 ID」，是一串數字，用雙引號包起來。
+# 留空代表停用串聯。
 msg-channel-id: ""
 
-# 指令結果頻道 ID（文字頻道）。留空代表不使用。
+# 指令結果頻道 ID（文字頻道），格式同上。留空代表不使用。
 cmd-channel-id: ""
 
-# 機器人的狀態文字（顯示成「正在玩…」）。留空則不顯示。
+# 機器人的狀態文字（顯示成「正在玩…」）。可填任意文字，留空則不顯示。
 status: ""
 
 # Discord 指令的前綴。以這個前綴開頭的訊息會變成指令事件，其餘當成聊天。
-# 留空代表不使用 Discord 指令。
+# 可填任意字元或文字（例如 "/" 或 "!"），留空代表不使用 Discord 指令。
 discord-command-prefix: "/"
 
-# 沒有任何插件處理某個 Discord 指令時的回覆。%name 是發話者名稱，%msg 是整段指令。
+# 沒有任何插件處理某個 Discord 指令時的回覆（可自訂，支援 Discord 的 Markdown）。
+# %name 會換成發話者名稱，%msg 會換成整段指令。
 unknown-command-msg: "`%name`不明的指令:%msg。請確認該指令是否存在,以及您是否具備使用該指令的權限。"
 
-# 開服提示（顏色用 #RRGGBB）
+# 開服提示：機器人連線成功時送到聊天頻道的嵌入訊息文字（可用 Discord 的 Markdown），留空則不送。
+# 顏色用 #RRGGBB 格式（例如 "#00EB00"），格式不對時用預設的淺灰色。
 bot-start-msg: "**與伺服器連接成功**"
 bot-start-color: "#00EB00"
 
-# 關服提示
+# 關服提示：插件停用時送到聊天頻道的嵌入訊息，填法同上。
 bot-stop-msg: "**與伺服器斷開連接**"
 bot-stop-color: "#FFA500"
 
 # ---------------------------------------------------------------- 帳號綁定
 
-# 綁定資料的儲存方式：sqlite（預設）、json、yaml。資料放在本插件的 links 資料夾。
+# 綁定資料的儲存方式：sqlite（預設）、json、yaml。
+# 資料放在 plugins/tokaDiscordLink/storage/<方式>/（舊版的 links 資料夾會自動複製過去，原資料夾保留）。
+# 更換方式不會自動搬移既有資料，請在已有綁定資料時不要隨意修改。
 storage:
   backend: sqlite
 

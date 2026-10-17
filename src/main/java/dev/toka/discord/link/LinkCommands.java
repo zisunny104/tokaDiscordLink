@@ -1,6 +1,7 @@
 package dev.toka.discord.link;
 
 import cn.nukkit.Server;
+import dev.toka.i18n.Messages;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
@@ -16,21 +17,24 @@ import java.util.UUID;
  */
 public final class LinkCommands extends ListenerAdapter {
 
+    private final Messages messages;
     private final LinkService links;
     private final MemberSync sync;
     private final int ttlMinutes;
 
-    public LinkCommands(LinkService links, MemberSync sync, int ttlSeconds) {
+    public LinkCommands(Messages messages, LinkService links, MemberSync sync, int ttlSeconds) {
+        this.messages = messages;
         this.links = links;
         this.sync = sync;
         this.ttlMinutes = Math.max(1, ttlSeconds / 60);
     }
 
-    public static List<CommandData> definitions() {
+    /** The names of the slash commands are fixed; only the descriptions come from the language file. */
+    public static List<CommandData> definitions(Messages messages) {
         return List.of(
-                Commands.slash("link", "把你的 Discord 帳號綁定到遊戲帳號")
-                        .addOption(OptionType.STRING, "code", "遊戲裡產生的代碼；不填就產生一個給遊戲輸入的代碼", false),
-                Commands.slash("unlink", "解除你的 Discord 帳號與遊戲帳號的綁定"));
+                Commands.slash("link", messages.text("discord.cmd.link.desc"))
+                        .addOption(OptionType.STRING, "code", messages.text("discord.cmd.link.code"), false),
+                Commands.slash("unlink", messages.text("discord.cmd.unlink.desc")));
     }
 
     @Override
@@ -43,7 +47,8 @@ public final class LinkCommands extends ListenerAdapter {
                 break;
             }
             case "unlink":
-                reply(event, this.links.unlinkDiscord(user) ? "已解除綁定。要再綁定需要重新驗證。" : "你目前沒有綁定任何遊戲帳號。");
+                reply(event, this.links.unlinkDiscord(user)
+                        ? this.messages.text("discord.unlinked") : this.messages.text("discord.notLinked"));
                 break;
             default:
                 break;
@@ -57,42 +62,41 @@ public final class LinkCommands extends ListenerAdapter {
     private String request(String user) {
         if (this.links.playerOf(user).isPresent()) {
             UUID player = this.links.playerOf(user).get();
-            return "你已經綁定遊戲帳號：" + nameOf(player) + "。要換的話請先 /unlink。";
+            return this.messages.text("discord.alreadyLinked", nameOf(player));
         }
         String code = this.links.codes().issue(PendingCodes.Side.DISCORD, user);
-        return "你的綁定代碼：**" + code + "**（" + this.ttlMinutes + " 分鐘內有效，只能用一次）。\n"
-                + "請在遊戲裡輸入：/discord link " + code + "\n不要把代碼給任何人。";
+        return this.messages.text("discord.codeIssued", code, this.ttlMinutes);
     }
 
     private String confirm(String user, String code) {
         LinkService.Confirmation result = this.links.confirm(PendingCodes.Side.DISCORD, user, code);
         switch (result.outcome()) {
             case LOCKED:
-                return "輸入錯誤太多次，請稍後再試。";
+                return this.messages.text("discord.locked");
             case WRONG_OR_EXPIRED:
-                return "代碼不正確或已經過期。請在遊戲裡重新輸入 /discord link 取得新的代碼。";
+                return this.messages.text("discord.wrongCode");
             default:
-                return describe(result, user, this.sync);
+                return this.describe(result);
         }
     }
 
-    /** The answer after a right code, also used by the game side. */
-    static String describe(LinkService.Confirmation result, String discordUser, MemberSync sync) {
+    /** The answer after a right code. */
+    private String describe(LinkService.Confirmation result) {
         UUID player = result.match().player();
         switch (result.result()) {
             case LINKED:
-                if (sync != null) {
-                    sync.sync(player, result.match().discordUser());
+                if (this.sync != null) {
+                    this.sync.sync(player, result.match().discordUser());
                 }
-                return "綁定完成：" + nameOf(player);
+                return this.messages.text("discord.linked", nameOf(player));
             case ALREADY_LINKED:
-                return "這兩個帳號早就綁定在一起了。";
+                return this.messages.text("discord.already");
             case PLAYER_HAS_OTHER:
-                return "這個遊戲帳號已經綁定了另一個 Discord 帳號。要換的話，先在遊戲輸入 /discord unlink。";
+                return this.messages.text("discord.playerHasOther");
             case DISCORD_HAS_OTHER:
-                return "這個 Discord 帳號已經綁定了另一個遊戲帳號。要換的話，先 /unlink。";
+                return this.messages.text("discord.discordHasOther");
             default:
-                return "綁定沒有儲存成功，請稍後再試，並通知管理員。";
+                return this.messages.text("discord.saveFailed");
         }
     }
 
