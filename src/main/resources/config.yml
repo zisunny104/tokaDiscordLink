@@ -81,4 +81,5 @@ roles: {}
 
 # 暱稱與身分組的定期同步間隔（秒），至少 60
 sync-interval-seconds: 300
-
+# 沒有可同步的內容（無綁定帳號，或暱稱與身分組都不管理）時改用的間隔（秒），不會小於上一項
+sync-interval-idle-seconds: 1800

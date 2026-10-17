@@ -142,12 +142,19 @@ public final class Main extends PluginBase implements Listener {
         DiscordLink.register(this.service);
         this.service.start(this.getConfig());
 
-        int interval = Math.max(60, this.getConfig().getInt("sync-interval-seconds", 300)) * 20;
-        this.getServer().getScheduler().scheduleDelayedRepeatingTask(this, () -> {
+        this.scheduleSync();
+    }
+
+    /** The next round comes at the normal interval, or at the longer one when there is nothing to sync. */
+    private void scheduleSync() {
+        int base = Math.max(60, this.getConfig().getInt("sync-interval-seconds", 300));
+        int idle = Math.max(base, this.getConfig().getInt("sync-interval-idle-seconds", 1800));
+        this.getServer().getScheduler().scheduleDelayedTask(this, () -> {
             if (this.service.isReady()) {
                 this.sync.syncAll();
             }
-        }, interval, interval);
+            this.scheduleSync();
+        }, (this.sync.idle() ? idle : base) * 20);
     }
 
     @Override

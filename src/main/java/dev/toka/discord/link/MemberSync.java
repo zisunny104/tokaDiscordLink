@@ -191,6 +191,11 @@ public final class MemberSync {
         });
     }
 
+    /** True when a sync round would change nothing: no linked account, or neither nicknames nor roles are managed. */
+    public boolean idle() {
+        return this.links.all().isEmpty() || (this.nicknameMode == NicknameMode.OFF && this.roles.isEmpty());
+    }
+
     /** All the linked accounts, one after the other, spread over the given time so that the rate limits hold. */
     public void syncAll() {
         Map<UUID, String> all = this.links.all();

@@ -10,6 +10,9 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The Discord side of the linking: {@code /link} makes a code or types one that the game made, {@code /unlink}
@@ -21,6 +24,13 @@ public final class LinkCommands extends ListenerAdapter {
     private final LinkService links;
     private final MemberSync sync;
     private final int ttlMinutes;
+    /** Link storage and offline name lookups are slow, so they stay off the Discord event thread. */
+    private final ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "toka-discord-link");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final ConcurrentHashMap<UUID, String> names = new ConcurrentHashMap<>();
 
     public LinkCommands(Messages messages, LinkService links, MemberSync sync, int ttlSeconds) {
         this.messages = messages;
@@ -39,6 +49,10 @@ public final class LinkCommands extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+        this.worker.execute(() -> this.handle(event));
+    }
+
+    private void handle(SlashCommandInteractionEvent event) {
         String user = event.getUser().getId();
         switch (event.getName()) {
             case "link": {
@@ -62,7 +76,7 @@ public final class LinkCommands extends ListenerAdapter {
     private String request(String user) {
         if (this.links.playerOf(user).isPresent()) {
             UUID player = this.links.playerOf(user).get();
-            return this.messages.text("discord.alreadyLinked", nameOf(player));
+            return this.messages.text("discord.alreadyLinked", this.nameOf(player));
         }
         String code = this.links.codes().issue(PendingCodes.Side.DISCORD, user);
         return this.messages.text("discord.codeIssued", code, this.ttlMinutes);
@@ -88,7 +102,7 @@ public final class LinkCommands extends ListenerAdapter {
                 if (this.sync != null) {
                     this.sync.sync(player, result.match().discordUser());
                 }
-                return this.messages.text("discord.linked", nameOf(player));
+                return this.messages.text("discord.linked", this.nameOf(player));
             case ALREADY_LINKED:
                 return this.messages.text("discord.already");
             case PLAYER_HAS_OTHER:
@@ -100,8 +114,10 @@ public final class LinkCommands extends ListenerAdapter {
         }
     }
 
-    private static String nameOf(UUID player) {
-        String name = Server.getInstance().getOfflinePlayer(player).getName();
-        return name == null ? player.toString() : name;
+    private String nameOf(UUID player) {
+        return this.names.computeIfAbsent(player, id -> {
+            String name = Server.getInstance().getOfflinePlayer(id).getName();
+            return name == null ? id.toString() : name;
+        });
     }
 }
