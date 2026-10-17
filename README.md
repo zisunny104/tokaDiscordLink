@@ -43,7 +43,7 @@
 | `sync-interval-seconds` | 暱稱與身分組的定期同步間隔，至少 60 |
 
 ## 多語系
-所有玩家看得到的文字、後台日誌與 Discord 回覆都放在共用套件 [tokaI18n](https://github.com/zisunny104/tokaI18n)（內嵌進 jar）的語系檔 `lang/zh-TW.yml`，目前只有繁體中文。語言由 `config.yml` 的 `language` 決定；想改個別文字，把同名檔放進 `plugins/tokaDiscordLink/lang/`，只寫要覆蓋的 key。開關服提示、未知指令回覆等管理員自訂的文字仍在 `config.yml`。詳見 [`docs/I18N.md`](docs/I18N.md)。
+所有玩家看得到的文字、後台日誌與 Discord 回覆都放在共用套件 [tokaI18n](https://github.com/zisunny104/tokaI18n)（內嵌進 jar）的語系檔 `lang/zh-TW.yml`，目前只有繁體中文。語言由 `config.yml` 的 `language` 決定；想改個別文字，把同名檔放進 `plugins/tokaDiscordLink/lang/`，只寫要覆蓋的 key。開關服提示、未知指令回覆等管理員自訂的文字仍在 `config.yml`。共用的多語系原則見[拆分主文件](https://github.com/zisunny104/zero/blob/master/docs/ARCHITECTURE.md)。
 
 ## 指令與權限
 遊戲內 `/discord [link [代碼] | unlink | info | status | help]`，Discord 內 `/link [code]` 與 `/unlink`（回覆只有你看得到）。
