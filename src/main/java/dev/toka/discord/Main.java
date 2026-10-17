@@ -180,7 +180,7 @@ public final class Main extends PluginBase implements Listener {
             // The last known name is display only; saving it is disk work, so it is off the server thread
             UUID id = event.getPlayer().getUniqueId();
             String name = event.getPlayer().getName();
-            this.getServer().getScheduler().scheduleTask(this, () -> this.links.updateName(id, name), true);
+            this.getServer().getScheduler().scheduleTask(this, () -> this.links.onLogin(id, name), true);
         }
         if (this.links == null || this.service == null || !this.service.isReady()) {
             return;

@@ -216,4 +216,25 @@ public class LinkTest {
             assertEquals("Steve", links.lastNameOf(player).orElse(null));
         }
     }
+
+    @Test
+    public void aLoginRefreshesTheCachedNameAndTheCacheIsBounded() throws Exception {
+        UUID player = UUID.randomUUID();
+        try (LinkService links = this.service(Backend.JSON, directory())) {
+            assertEquals("Old", links.cachedName(player, id -> "Old"));
+            assertEquals("Old", links.cachedName(player, id -> "Other"));
+            // not linked, but the cached name still follows the rename
+            links.onLogin(player, "New");
+            assertEquals("New", links.cachedName(player, id -> "Other"));
+            // a player that is not cached is not added by a login
+            UUID other = UUID.randomUUID();
+            links.onLogin(other, "Nobody");
+            assertEquals("Loaded", links.cachedName(other, id -> "Loaded"));
+            // a full cache is cleared instead of growing
+            for (int i = 0; i < LinkService.NAME_CACHE_LIMIT + 5; i++) {
+                links.cachedName(UUID.randomUUID(), id -> "n");
+            }
+            assertEquals("Again", links.cachedName(player, id -> "Again"));
+        }
+    }
 }

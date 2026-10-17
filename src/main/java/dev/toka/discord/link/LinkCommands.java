@@ -10,7 +10,6 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -30,7 +29,6 @@ public final class LinkCommands extends ListenerAdapter {
         thread.setDaemon(true);
         return thread;
     });
-    private final ConcurrentHashMap<UUID, String> names = new ConcurrentHashMap<>();
 
     public LinkCommands(Messages messages, LinkService links, MemberSync sync, int ttlSeconds) {
         this.messages = messages;
@@ -117,7 +115,7 @@ public final class LinkCommands extends ListenerAdapter {
     }
 
     private String nameOf(UUID player) {
-        return this.names.computeIfAbsent(player, id -> {
+        return this.links.cachedName(player, id -> {
             String name = Server.getInstance().getOfflinePlayer(id).getName();
             return name == null ? id.toString() : name;
         });

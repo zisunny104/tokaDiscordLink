@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 
 /**
@@ -89,6 +91,31 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
     /** @return the last known name of a linked player, for display only */
     public synchronized Optional<String> lastNameOf(UUID playerId) {
         return Optional.ofNullable(this.lastNames.get(playerId));
+    }
+
+    /** Most names the offline name cache holds; when it is full it is cleared, which only costs new lookups. */
+    public static final int NAME_CACHE_LIMIT = 2048;
+    private final ConcurrentHashMap<UUID, String> nameCache = new ConcurrentHashMap<>();
+
+    /** The cached name of a player, loaded with {@code loader} (an offline lookup, so off the server thread) when missing. */
+    public String cachedName(UUID player, Function<UUID, String> loader) {
+        String name = this.nameCache.get(player);
+        if (name == null) {
+            name = loader.apply(player);
+            if (this.nameCache.size() >= NAME_CACHE_LIMIT) {
+                this.nameCache.clear();
+            }
+            this.nameCache.put(player, name);
+        }
+        return name;
+    }
+
+    /** A player logged in with this name: refreshes a cached name, then remembers the name of a linked player. */
+    public boolean onLogin(UUID player, String name) {
+        if (name != null && !name.isBlank()) {
+            this.nameCache.computeIfPresent(player, (id, old) -> name);
+        }
+        return this.updateName(player, name);
     }
 
     /**
