@@ -58,6 +58,11 @@ public final class PendingCodes {
         this.lockoutMillis = lockoutSeconds * 1000;
     }
 
+    /** How long a locked-out owner must wait, in seconds. */
+    public long lockoutSeconds() {
+        return this.lockoutMillis / 1000;
+    }
+
     private static String ownerKey(Side side, String owner) {
         return side + ":" + owner;
     }

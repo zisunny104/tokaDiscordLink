@@ -72,7 +72,7 @@ public final class LinkCommands extends ListenerAdapter {
         LinkService.Confirmation result = this.links.confirm(PendingCodes.Side.DISCORD, user, code);
         switch (result.outcome()) {
             case LOCKED:
-                return this.messages.text("discord.locked");
+                return this.messages.text("discord.locked", this.links.codes().lockoutSeconds());
             case WRONG_OR_EXPIRED:
                 return this.messages.text("discord.wrongCode");
             default:

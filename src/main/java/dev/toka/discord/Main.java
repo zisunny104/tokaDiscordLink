@@ -295,7 +295,7 @@ public final class Main extends PluginBase implements Listener {
             LinkService.Confirmation result = this.links.confirm(PendingCodes.Side.GAME, uuid.toString(), args[1]);
             switch (result.outcome()) {
                 case LOCKED:
-                    sender.sendMessage(this.messages.text("err.codeLocked"));
+                    sender.sendMessage(this.messages.text("err.codeLocked", this.links.codes().lockoutSeconds()));
                     return;
                 case WRONG_OR_EXPIRED:
                     sender.sendMessage(this.messages.text("err.codeWrong"));

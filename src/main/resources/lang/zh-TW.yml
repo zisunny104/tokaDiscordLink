@@ -26,7 +26,7 @@ cmd:
 help:
   # 所有人看得到的說明
   discord:
-    - "§6§l/discord 說明"
+    - "§6=== §f§l/discord 說明§r §6==="
     - "§e/discord help §7- §b顯示這份說明"
     - "§e/discord info §7- §b查看自己的綁定（等同 /discord）"
     - "§e/discord link §7- §b產生綁定代碼，到 Discord 輸入 /link code:代碼 完成綁定"
@@ -51,9 +51,9 @@ msg:
     # 產生代碼 ${0}=代碼 ${1}=有效分鐘數
     code: "§b您的綁定代碼：§a${0}§b（§a${1} §b分鐘內有效，只能用一次）"
     # 產生代碼的提示 ${0}=代碼
-    codeHint: "§b請到 Discord 輸入：§a/link code:${0}§b　不要把代碼給任何人。"
+    codeHint: "§b到 Discord 輸入：§a/link code:${0}"
     # Discord 機器人還沒就緒時的提醒
-    botNotReady: "§e注意：Discord 機器人目前沒有就緒，請稍後再到 Discord 輸入。"
+    botNotReady: "§eDiscord 機器人尚未就緒。"
     # 綁定完成 ${0}=玩家名稱（查不到名稱時是 UUID）
     done: "§a綁定完成：${0}"
     # 這兩個帳號本來就綁在一起
@@ -84,20 +84,21 @@ msg:
 err:
   # ${0}=停用原因（見 status.reason.*）
   bindingUnavailable: "§c綁定功能目前不能使用：${0}"
-  noPermissionStatus: "§c您沒有權限查看狀態。"
+  noPermissionStatus: "§c沒有權限查看狀態。"
   needOpLink: "§c替別人綁定需要 OP 權限。"
   needOpUnlink: "§c替別人解除綁定需要 OP 權限。"
   needOpInfo: "§c查看別人的綁定需要 OP 權限。"
-  invalidDiscordId: "§cDiscord 使用者 ID 是一串數字，請在 Discord 開啟開發者模式後，對使用者按右鍵複製 ID。"
+  invalidDiscordId: "§cDiscord 使用者 ID 是一串數字（Discord 開發者模式下對使用者按右鍵可複製）。"
   # ${0}=輸入的玩家名稱
   playerNotFound: "§c找不到玩家「§a${0}§c」，對方需要進過伺服器。"
-  codeLocked: "§c輸入錯誤太多次，請稍後再試。"
-  codeWrong: "§c代碼不正確或已經過期。請在 Discord 輸入 /link 取得新的代碼。"
+  # ${0}=鎖定秒數
+  codeLocked: "§c輸入錯誤太多次，鎖定 §a${0} §c秒。"
+  codeWrong: "§c代碼不正確或已過期。"
   unlinkNone: "§c沒有可以解除的綁定。"
   link:
     playerHasOther: "§c這個遊戲帳號已經綁定了另一個 Discord 帳號。要換的話，先 /discord unlink。"
     discordHasOther: "§c這個 Discord 帳號已經綁定了另一個遊戲帳號。要換的話，先到 Discord 輸入 /unlink。"
-    saveFailed: "§c綁定沒有儲存成功，請稍後再試，並通知管理員。"
+    saveFailed: "§c綁定儲存失敗，未綁定。"
 
 # ---------------------------------------------------------------- 後台日誌（不加方括號標籤，文字 §b、數字 §a、警告 §e、成功 §a）
 log:
@@ -119,7 +120,7 @@ log:
   # ${0}=錯誤訊息
   registerFailed: "§e註冊 /link 指令失敗：${0}"
   # ${0}=設定欄位名稱（msg-channel-id 或 cmd-channel-id） ${1}=設定的頻道 ID
-  channelNotFound: "§e找不到頻道（${0}）：§a${1}§e。請確認機器人在那個伺服器，且有權限看到它。"
+  channelNotFound: "§e找不到頻道（${0}）：§a${1}§e；機器人不在該伺服器或無權限看到它。"
   # ${0}=執行者名稱 ${1}=玩家 UUID ${2}=Discord 使用者 ID
   linkedByAdmin: "§b${0} 把 §a${1} §b綁到 Discord §a${2}"
   # ${0}=執行者名稱 ${1}=玩家 UUID
@@ -140,12 +141,12 @@ status:
   # 連線失敗原因 ${0}=例外類別名稱 ${1}=錯誤訊息
   failure: "${0}：${1}"
   # 疑似沒開 Message Content Intent 時接在失敗原因後面
-  intentHint: "（請到 Discord Developer Portal 的 Bot 頁面，開啟 Message Content Intent）"
+  intentHint: "（需在 Discord Developer Portal 的 Bot 頁面開啟 Message Content Intent）"
   # Discord 串聯停用的原因
   reason:
     # ${0}=錯誤訊息
     storage: "綁定資料無法開啟：${0}"
-    onePlugin: "舊的 one 插件還在執行，請先移除 one，再啟用本插件"
+    onePlugin: "舊的 one 插件仍在執行，需先移除 one"
     noToken: "config.yml 的 token 還沒有設定"
     noMsgChannel: "config.yml 的 msg-channel-id 還沒有設定"
 
@@ -162,19 +163,19 @@ discord:
   unlinked: "已解除綁定。要再綁定需要重新驗證。"
   notLinked: "你目前沒有綁定任何遊戲帳號。"
   # ${0}=遊戲玩家名稱
-  alreadyLinked: "你已經綁定遊戲帳號：${0}。要換的話請先 /unlink。"
-  # 產生代碼（三行） ${0}=代碼 ${1}=有效分鐘數
+  alreadyLinked: "你已綁定遊戲帳號：${0}。換綁需先 /unlink。"
+  # 產生代碼（兩行） ${0}=代碼 ${1}=有效分鐘數
   codeIssued:
     - "你的綁定代碼：**${0}**（${1} 分鐘內有效，只能用一次）。"
-    - "請在遊戲裡輸入：/discord link ${0}"
-    - "不要把代碼給任何人。"
-  locked: "輸入錯誤太多次，請稍後再試。"
-  wrongCode: "代碼不正確或已經過期。請在遊戲裡重新輸入 /discord link 取得新的代碼。"
+    - "遊戲內輸入：/discord link ${0}"
+  # ${0}=鎖定秒數
+  locked: "輸入錯誤太多次，鎖定 ${0} 秒。"
+  wrongCode: "代碼不正確或已過期。"
   # ${0}=遊戲玩家名稱
   linked: "綁定完成：${0}"
   already: "這兩個帳號早就綁定在一起了。"
   playerHasOther: "這個遊戲帳號已經綁定了另一個 Discord 帳號。要換的話，先在遊戲輸入 /discord unlink。"
   discordHasOther: "這個 Discord 帳號已經綁定了另一個遊戲帳號。要換的話，先 /unlink。"
-  saveFailed: "綁定沒有儲存成功，請稍後再試，並通知管理員。"
+  saveFailed: "綁定儲存失敗，未綁定。"
   # config.yml 的 unknown-command-msg 欄位不存在時的預設（沒有 ${n} 參數；%name 是發話者名稱，%msg 是整段指令，由插件替換）
   unknownCommand: "`%name`不明的指令:%msg"
