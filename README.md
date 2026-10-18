@@ -1,6 +1,6 @@
 # tokaDiscordLink
 
-連接伺服器與 Discord 的橋樑：機器人上線、玩家綁定自己的 Discord 帳號、同步暱稱，並讓其他插件收發 Discord 頻道的訊息與指令。
+Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指令。
 
 ## 主要功能
 
@@ -20,22 +20,23 @@
 | `/discord help` | 顯示說明 |
 
 在 Discord 也可以反過來：輸入 `/link` 取得代碼，再到遊戲輸入 `/discord link <代碼>`；`/unlink` 解除綁定。
-（圖：Discord 中輸入 `/link` 後機器人回覆代碼的畫面）
 
 ## 管理指令
 
 | 指令 | 用法 | 說明 | 權限 |
 | --- | --- | --- | --- |
 | `/discord status` | `/discord status` | 查看機器人連線、頻道與綁定狀態 | `tokaDiscordLink.admin` |
-| `/discord link` | `/discord link <玩家> <Discord使用者ID>` | 替玩家直接綁定（玩家需進過伺服器） | `tokaDiscordLink.admin` |
+| `/discord link` | `/discord link <玩家> <Discord使用者ID>` | 替已進過伺服器的玩家綁定 | `tokaDiscordLink.admin` |
 | `/discord unlink` | `/discord unlink <玩家>` | 解除玩家的綁定 | `tokaDiscordLink.admin` |
 | `/discord info` | `/discord info <玩家>` | 查看玩家綁定的 Discord 使用者 ID | `tokaDiscordLink.admin` |
 
-`tokaDiscordLink.use`（綁定自己的帳號）預設所有人，`tokaDiscordLink.admin` 預設 OP；後台也可執行管理指令。
+`tokaDiscordLink.use` 預設所有人，可綁定自己的帳號；`tokaDiscordLink.admin` 預設 OP。主控台也可執行管理指令。
 
 初次設定：到 Discord Developer Portal 建立機器人並開啟 Message Content Intent，取得令牌，填入 `token` 與 `msg-channel-id` 後重新啟動。令牌等同密碼，請勿公開。暱稱同步需要機器人有「管理暱稱」權限，且角色高於對方；伺服器擁有者的暱稱無法更改。
 
-## 設定（`config.yml`，變更後需重新啟動）
+## 設定 config.yml
+
+變更後需重新啟動。
 
 | key | 預設 | 說明 |
 | --- | --- | --- |
@@ -64,6 +65,7 @@
 | `sendMessage` | 文字［, 頻道 `msg`／`cmd`］ | 送出文字訊息 |
 | `sendEmbedMessage` | 文字［, 顏色 `#RRGGBB`, 頻道］ | 送出嵌入訊息 |
 | `deleteMessage` | 訊息 ID［, 頻道］ | 刪除訊息 |
+| `importLink` | 玩家 UUID、Discord 使用者 ID | 匯入舊綁定；遇到衝突不覆蓋，回傳 `ImportResult` |
 | `setIdentityResolver` | `IdentityResolver` | 提供 Discord 帳號與玩家的對照 |
 | `BotMessageEvent` | `getMsg()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 聊天頻道的一般訊息，可取消 |
 | `BotCommandEvent` | `getCommand()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 帶前綴的指令；處理後呼叫 `setHandled(true)`，否則回覆未知指令 |
@@ -73,5 +75,3 @@
 - **機器人沒有上線？** 確認 `token` 與 `msg-channel-id` 已填，且已開啟 Message Content Intent。
 - **暱稱沒有變？** 檢查機器人是否有「管理暱稱」權限，且角色比對方高。
 - **綁定代碼無效？** 代碼只能用一次且會過期，連續錯誤會暫時鎖定。
-
-目前版本 0.3.1
