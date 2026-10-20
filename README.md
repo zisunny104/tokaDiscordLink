@@ -75,3 +75,18 @@
 - **綁定代碼無效？** 代碼只能用一次且會過期，連續錯誤會暫時鎖定。
 
 目前版本 0.3.1
+
+### Plan 選用整合（0.3.2）
+
+預設自動接入 Plan，提供 `bound`（玩家是否綁定 Discord）的布林狀態，不公開 Discord ID、名稱、群組、權杖或驗證碼。資料來自成功儲存後發布的 immutable 綁定存在快照，Provider 不取得儲存鎖、不讀磁碟/玩家/Discord 網路。機器人未啟動仍可展示已有的本機綁定。
+
+使用官方 Plan API5.7-R0.2 provided，核對 Plan5.8 build3638 Builder API。Plan 缺少/停用/能力不足自動略過；支援啟用停用及插件卸載。Plan 模式與欄位可用下列管理指令即時套用，欄位走 tokaI18n `plan`。Plan 網頁權限與歷史資料由 Plan 管理；停用整合不會刪除已保存的狀態。
+
+
+### Plan 模式與管理指令
+
+預設 `plan.mode: auto`、`plan.fields: all`。`auto` 偵測到可用 Plan 就啟用；`enable` 未就緒時提示；`disable` 一定不發布。all 僅包含本插件核准的摘要欄位，沒有憑證、Discord ID 或私人座標。
+
+管理員可用 `/discord plan status`、`/discord plan mode <auto|enable|disable>`、`/discord plan fields <all|none|欄位...>`；變更保存設定且即時套用，保留其他設定及註解。舊 `plan.enabled`／逐項布林仍相容，明確設定的新 mode／fields 優先。
+
+API（主執行緒）：`planStatusJson()`、`configurePlan(String mode, String[] fields)`；null 表示該項沿用。

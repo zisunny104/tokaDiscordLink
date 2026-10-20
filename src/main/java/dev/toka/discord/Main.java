@@ -34,6 +34,8 @@ public final class Main extends PluginBase implements Listener {
     private DiscordService service;
     private String disabledReason;
     private Messages messages;
+    private AutoCloseable plan;
+    private dev.toka.discord.plan.PlanControl planControl;
 
     /** The texts of the plugin, in the language of {@code language} in config.yml. */
     public Messages messages() {
@@ -122,6 +124,7 @@ public final class Main extends PluginBase implements Listener {
         });
         this.sync = new MemberSync(this, this.links, this.getConfig());
         this.getServer().getPluginManager().registerEvents(this, this);
+        refreshPlan();
 
         Plugin one = this.getServer().getPluginManager().getPlugin("one");
         if (one != null && one.isEnabled()) {
@@ -159,6 +162,7 @@ public final class Main extends PluginBase implements Listener {
 
     @Override
     public void onDisable() {
+        closePlan();
         if (this.service != null) {
             DiscordLink.unregister(this.service);
             this.service.stop(this.getConfig());
@@ -193,6 +197,7 @@ public final class Main extends PluginBase implements Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if(planControl!=null&&planControl.command(sender,args,PERMISSION_ADMIN))return true;
         String sub = args.length == 0 ? "info" : args[0].toLowerCase(Locale.ROOT);
         boolean admin = sender.hasPermission(PERMISSION_ADMIN) || !(sender instanceof Player);
         if (this.links == null && !sub.equals("status") && !sub.equals("help")) {
@@ -409,4 +414,14 @@ public final class Main extends PluginBase implements Listener {
                 return this.messages.text("err.link.saveFailed");
         }
     }
+    private void closePlan(){if(planControl!=null)planControl.registered(false);if(plan!=null)try{plan.close();}catch(Exception|LinkageError e){getLogger().warning(messages.text("plan.unavailable",e.getClass().getSimpleName()));}finally{plan=null;}}
+    private void refreshPlan(){closePlan();
+        if(planControl==null)planControl=new dev.toka.discord.plan.PlanControl(this,this::refreshPlan,()->java.util.Set.of("bound"),(key,args)->messages.text(key,args),"discord");var plugin=getServer().getPluginManager().getPlugin("Plan");
+        if(links==null||!planControl.shouldRegister()||!planControl.options().has("bound"))return;
+        try{var extension=new dev.toka.discord.plan.PlanExtension(links::hasBinding,key->messages.text(key));
+            if(extension.register()){plan=extension;planControl.registered(true);getLogger().info(messages.text("plan.ready"));}else getLogger().warning(messages.text("plan.unsupported"));
+        }catch(RuntimeException|LinkageError e){getLogger().warning(messages.text("plan.unavailable",e.getClass().getSimpleName()));}}
+    @EventHandler public void planEnable(cn.nukkit.event.plugin.PluginEnableEvent e){if("Plan".equals(e.getPlugin().getName()))refreshPlan();}
+    @EventHandler public void planDisable(cn.nukkit.event.plugin.PluginDisableEvent e){if("Plan".equals(e.getPlugin().getName()))closePlan();}    public String planStatusJson(){return planControl.statusJson();}
+    public boolean configurePlan(String mode,String[] fields){return planControl.configure(mode,fields);}
 }

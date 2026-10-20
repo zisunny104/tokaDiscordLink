@@ -1,0 +1,7 @@
+package dev.toka.discord.plan;
+import org.junit.Test;import static org.junit.Assert.*;import java.util.*;
+public class PlanControlTest {
+ @Test public void modesFieldsAndLegacy(){var known=Set.of("one","two");var defaults=PlanControl.parse(Map.of(),known);assertEquals("auto",defaults.mode());assertTrue(defaults.has("one"));var disabled=PlanControl.parse(Map.of("plan",Map.of("mode","disable","fields","all")),known);assertFalse(disabled.enabled());var none=PlanControl.parse(Map.of("plan",Map.of("fields","none")),known);assertFalse(none.has("one"));var selected=PlanControl.parse(Map.of("plan",Map.of("fields",List.of("two"))),known);assertTrue(selected.has("two"));assertFalse(selected.has("one"));var legacy=PlanControl.parse(Map.of("plan",Map.of("enabled",false,"one",true)),known);assertFalse(legacy.enabled());assertTrue(legacy.has("one"));}
+ @Test public void editsPreserveUnrelatedSettings(){String input="# comment\nother: value\nplan:\n  mode: disable\n  fields:\n    - one\n  refresh-seconds: 30 # keep\nnext: true\n";String out=PlanControl.edit(input,"auto",Set.of("all"));assertTrue(out.contains("# comment"));assertTrue(out.contains("other: value"));assertTrue(out.contains("refresh-seconds: 30 # keep"));assertTrue(out.contains("next: true"));assertFalse(out.contains("- one"));assertTrue(out.contains("mode: auto"));}
+ @Test(expected=IllegalArgumentException.class) public void unknownFieldRejected(){PlanControl.parse(Map.of("plan",Map.of("fields","secret")),Set.of("one"));}
+}

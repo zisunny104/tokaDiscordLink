@@ -41,6 +41,9 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
     private final PendingCodes codes;
 
     private final Map<UUID, String> discordOfPlayer = new HashMap<>();
+    private volatile java.util.Set<UUID> boundPlayers = java.util.Set.of();
+    /** Lock-free immutable binding-presence view; contains no Discord identifiers. */
+    public boolean hasBinding(UUID player) { return boundPlayers.contains(player); }
     private final Map<String, UUID> playerOfDiscord = new HashMap<>();
     /** The last name a linked player was seen with. Display only, never used to find a link. */
     private final Map<UUID, String> lastNames = new HashMap<>();
@@ -67,7 +70,9 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
                 this.lastNames.put(player, json.get("name").getAsString());
             }
         }
+        this.boundPlayers = java.util.Set.copyOf(this.discordOfPlayer.keySet());
     }
+
 
     @Override
     public void close() throws IOException {
@@ -188,6 +193,7 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
         }
 
         this.discordOfPlayer.put(player, discordUserId);
+        this.boundPlayers = java.util.Set.copyOf(this.discordOfPlayer.keySet());
         this.playerOfDiscord.put(discordUserId, player);
         this.linkedAt.put(player, now);
         if (name != null && !name.isBlank()) {
@@ -210,6 +216,7 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
             return false;
         }
         this.discordOfPlayer.remove(player);
+        this.boundPlayers = java.util.Set.copyOf(this.discordOfPlayer.keySet());
         this.playerOfDiscord.remove(discord);
         this.lastNames.remove(player);
         this.linkedAt.remove(player);

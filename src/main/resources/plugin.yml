@@ -1,10 +1,11 @@
 name: tokaDiscordLink
 main: dev.toka.discord.Main
-version: 0.3.1
+version: 0.3.2
 api: ["1.0.0"]
 author: zisunny104
 description: 遊戲與 Discord 之間的串聯：機器人、訊息收發、指令事件，並預留帳號綁定介面
 load: POSTWORLD
+softdepend: [Plan]
 commands:
   discord:
     description: Discord 帳號綁定與狀態
@@ -17,4 +18,3 @@ permissions:
   tokaDiscordLink.admin:
     description: 查看狀態，替別人綁定、解除與查看綁定（目前等同 OP）
     default: op
-

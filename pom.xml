@@ -4,14 +4,16 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.toka</groupId>
   <artifactId>tokaDiscordLink</artifactId>
-  <version>0.3.1</version>
+  <version>0.3.2</version>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
+  <repositories><repository><id>plan-releases</id><url>https://repo.playeranalytics.net/releases</url></repository></repositories>
   <dependencies>
+    <dependency><groupId>com.djrapitops</groupId><artifactId>plan-api</artifactId><version>5.7-R0.2</version><scope>provided</scope></dependency>
     <dependency>
       <groupId>cn.nukkit</groupId>
       <artifactId>Nukkit</artifactId>
@@ -145,5 +147,3 @@
     </plugins>
   </build>
 </project>
-
-

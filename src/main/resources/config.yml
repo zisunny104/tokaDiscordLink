@@ -83,3 +83,8 @@ roles: {}
 sync-interval-seconds: 300
 # 沒有可同步的內容（無綁定帳號，或暱稱與身分組都不管理）時改用的間隔（秒），不會小於上一項
 sync-interval-idle-seconds: 1800
+
+# 選用 Plan 展示，只公開是否綁定；預設 auto；使用管理指令即時切換。
+plan:
+  mode: auto # auto 自動偵測；enable 未就緒時提示；disable 不發布。
+  fields: all # all | none | 欄位清單；指令可逐項管理。
