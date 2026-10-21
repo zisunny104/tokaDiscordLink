@@ -7,7 +7,7 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 - **機器人連線**：填入令牌與頻道後，機器人會連上 Discord，並在開服與關服時於聊天頻道發出提示。
 - **帳號綁定**：玩家與 Discord 帳號一對一綁定，用一次性代碼確認，代碼預設 10 分鐘有效，連續輸入錯誤會暫時鎖定。
 - **暱稱同步**：綁定後，Discord 暱稱會改成遊戲名稱，之後定期更新。
-- **供其他插件使用**：聊天頻道的訊息與指令會轉成事件；其他插件也能透過 API 把訊息送到 Discord。本插件本身不轉送遊戲聊天。
+- **供其他插件使用**：聊天頻道的訊息與指令會轉成事件；一般訊息也可透過不暴露事件類別的 callback 串接，避免不同外掛 classloader 的事件型別衝突。其他插件也能透過 API 把訊息送到 Discord。本插件本身不轉送遊戲聊天。
 
 ## 玩家指令
 
@@ -67,6 +67,7 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 | `deleteMessage` | 訊息 ID［, 頻道］ | 刪除訊息 |
 | `importLink` | 玩家 UUID、Discord 使用者 ID | 匯入舊綁定；遇到衝突不覆蓋，回傳 `ImportResult` |
 | `setIdentityResolver` | `IdentityResolver` | 提供 Discord 帳號與玩家的對照 |
+| `registerInboundHandler`／`unregisterInboundHandler` | 擁有者名稱、`Consumer<String[]>` | 註冊或移除一般聊天訊息 callback；資料依序為已綁定玩家 UUID（未綁定為空字串）、訊息、訊息 ID |
 | `BotMessageEvent` | `getMsg()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 聊天頻道的一般訊息，可取消 |
 | `BotCommandEvent` | `getCommand()`、`getSenderId()`、`getSenderName()`、`getLinkedPlayer()` | 帶前綴的指令；處理後呼叫 `setHandled(true)`，否則回覆未知指令 |
 
@@ -76,7 +77,7 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 - **暱稱沒有變？** 檢查機器人是否有「管理暱稱」權限，且角色比對方高。
 - **綁定代碼無效？** 代碼只能用一次且會過期，連續錯誤會暫時鎖定。
 
-### Plan 選用整合（0.3.2）
+### Plan 選用整合（0.3.3）
 
 預設自動接入 Plan，提供 `bound`（玩家是否綁定 Discord）的布林狀態，不公開 Discord ID、名稱、群組、權杖或驗證碼。資料來自成功儲存後發布的 immutable 綁定存在快照，Provider 不取得儲存鎖、不讀磁碟/玩家/Discord 網路。機器人未啟動仍可展示已有的本機綁定。
 

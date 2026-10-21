@@ -71,7 +71,12 @@ final class DiscordListener extends ListenerAdapter {
             }
             DiscordLink.deleteMessage(messageId);
         } else {
-            this.plugin.getServer().getPluginManager().callEvent(new BotMessageEvent(message, messageId, id, name));
+            BotMessageEvent botMessage = new BotMessageEvent(message, messageId, id, name);
+            this.plugin.getServer().getPluginManager().callEvent(botMessage);
+            if (!botMessage.isCancelled()) {
+                String linkedPlayer = botMessage.getLinkedPlayer().map(Object::toString).orElse("");
+                DiscordLink.publishInboundMessage(linkedPlayer, message, messageId);
+            }
         }
     }
 }

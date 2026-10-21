@@ -2,6 +2,9 @@ package dev.toka.discord.api;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * What other plugins use of tokaDiscordLink. Every method is safe to call when Discord is not set up or not ready
@@ -52,6 +55,7 @@ public final class DiscordLink {
     private static volatile Transport transport;
     private static volatile IdentityResolver identityResolver;
     private static volatile LinkImporter importer;
+    private static final Map<String, Consumer<String[]>> inboundHandlers = new ConcurrentHashMap<>();
 
     private DiscordLink() {
     }
@@ -136,5 +140,30 @@ public final class DiscordLink {
         LinkImporter current = importer;
         return current == null || player == null || discordUserId == null
                 ? ImportResult.REJECTED : current.importLink(player, discordUserId);
+    }
+
+    /** Registers an optional game-chat bridge without exposing BotMessageEvent across plugin classloaders.
+     * The callback receives [linked player UUID or empty string, message, message ID]. */
+    public static void registerInboundHandler(String owner, Consumer<String[]> handler) {
+        if (owner == null || owner.isBlank() || handler == null) {
+            throw new IllegalArgumentException("owner and handler are required");
+        }
+        inboundHandlers.put(owner, handler);
+    }
+
+    /** Removes a handler registered by the given plugin. */
+    public static void unregisterInboundHandler(String owner) {
+        if (owner != null) inboundHandlers.remove(owner);
+    }
+
+    /** Called by tokaDiscordLink after BotMessageEvent has been dispatched and was not cancelled. */
+    public static void publishInboundMessage(String linkedPlayer, String message, String messageId) {
+        String[] payload = {linkedPlayer == null ? "" : linkedPlayer, message, messageId};
+        for (Consumer<String[]> handler : inboundHandlers.values()) {
+            try { handler.accept(payload.clone()); }
+            catch (RuntimeException | LinkageError ignored) {
+                // A dependent plugin is optional; one broken handler must not interrupt Discord processing.
+            }
+        }
     }
 }
