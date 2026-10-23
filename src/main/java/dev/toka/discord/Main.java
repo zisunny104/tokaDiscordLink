@@ -41,14 +41,6 @@ public final class Main extends PluginBase implements Listener {
     private AutoCloseable plan;
     private dev.toka.discord.plan.PlanControl planControl;
 
-    /** The texts of the plugin, in the language of {@code language} in config.yml. */
-    /** Whether the commands written in the Discord channel (list, c, ser) are handled here. For zero's hand-over check, by reflection. */
-    public static boolean handlesBotCommands() {
-        return links() != null;
-    }
-
-    private static LinkService links() { return instance == null ? null : instance.links; }
-
     public Messages messages() {
         return this.messages;
     }
