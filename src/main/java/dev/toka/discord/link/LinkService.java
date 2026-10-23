@@ -43,6 +43,11 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
     private final Map<UUID, String> discordOfPlayer = new HashMap<>();
     private volatile java.util.Set<UUID> boundPlayers = java.util.Set.of();
     /** Lock-free immutable binding-presence view; contains no Discord identifiers. */
+    private volatile java.util.function.BiConsumer<UUID, Boolean> changed = (player, linked) -> { };
+
+    /** Told after a link is made (true) or removed (false). */
+    public void onChange(java.util.function.BiConsumer<UUID, Boolean> listener) { this.changed = listener; }
+
     public boolean hasBinding(UUID player) { return boundPlayers.contains(player); }
     private final Map<String, UUID> playerOfDiscord = new HashMap<>();
     /** The last name a linked player was seen with. Display only, never used to find a link. */
@@ -201,6 +206,7 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
         }
         this.codes.cancel(PendingCodes.Side.GAME, player.toString());
         this.codes.cancel(PendingCodes.Side.DISCORD, discordUserId);
+        this.changed.accept(player, true);
         return Result.LINKED;
     }
 
@@ -220,6 +226,7 @@ public final class LinkService implements IdentityResolver, AutoCloseable {
         this.playerOfDiscord.remove(discord);
         this.lastNames.remove(player);
         this.linkedAt.remove(player);
+        this.changed.accept(player, false);
         return true;
     }
 

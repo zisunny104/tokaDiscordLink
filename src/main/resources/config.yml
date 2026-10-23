@@ -88,3 +88,8 @@ sync-interval-idle-seconds: 1800
 plan:
   mode: auto # auto 自動偵測；enable 未就緒時提示；disable 不發布。
   fields: all # all | none | 欄位清單；指令可逐項管理。
+
+# 有 Discord 連結的玩家所在的權限群組（需要 LuckPerms）。綁定時加入、解除時移除，啟動時補齊。
+linked-group:
+  enabled: true
+  name: linked

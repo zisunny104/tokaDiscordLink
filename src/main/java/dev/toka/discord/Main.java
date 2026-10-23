@@ -5,6 +5,8 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerJoinEvent;
@@ -13,6 +15,7 @@ import cn.nukkit.plugin.PluginBase;
 import dev.toka.discord.api.DiscordLink;
 import dev.toka.discord.chat.DiscordService;
 import dev.toka.discord.link.LinkService;
+import dev.toka.discord.link.LinkedGroup;
 import dev.toka.discord.link.MemberSync;
 import dev.toka.discord.link.PendingCodes;
 import dev.toka.i18n.Messages;
@@ -88,6 +91,16 @@ public final class Main extends PluginBase implements Listener {
     @Override
     public void onEnable() {
         this.saveDefaultConfig();
+        suggest("discord",
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"})},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"info"}), CommandParameter.newType("player", true, CommandParamType.TARGET)},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"status"})},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"link"}), CommandParameter.newType("code", true, CommandParamType.STRING)},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"link"}), CommandParameter.newType("player", CommandParamType.TARGET), CommandParameter.newType("discord_user_id", CommandParamType.STRING)},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"unlink"}), CommandParameter.newType("player", true, CommandParamType.TARGET)},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"plan"}), CommandParameter.newEnum("plan_action", new String[]{"status"})},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"plan"}), CommandParameter.newEnum("plan_action", new String[]{"mode"}), CommandParameter.newEnum("mode", new String[]{"auto", "enable", "disable"})},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"plan"}), CommandParameter.newEnum("plan_action", new String[]{"fields"}), CommandParameter.newType("fields", true, CommandParamType.RAWTEXT)});
         this.messages = new Messages(this.getClass().getClassLoader(), this.getDataFolder().toPath(),
                 this.getConfig().getString("language", "zh-TW"), line -> this.getLogger().warning(line));
 
@@ -105,6 +118,11 @@ public final class Main extends PluginBase implements Listener {
             this.getLogger().error(this.messages.text("log.storageOpenFailed"), e);
             this.disabledReason = this.messages.text("status.reason.storage", e.getMessage());
             return;
+        }
+        if (this.getConfig().getBoolean("linked-group.enabled", true)) {
+            LinkedGroup linkedGroup = new LinkedGroup(this, this.getConfig().getString("linked-group.name", "linked"));
+            this.links.onChange(linkedGroup::set);
+            this.getServer().getScheduler().scheduleDelayedTask(this, () -> linkedGroup.fill(this.links.all().keySet()), 200);
         }
         DiscordLink.setIdentityResolver(this.links);
         DiscordLink.setLinkImporter((player, discordUserId) -> {
@@ -146,6 +164,13 @@ public final class Main extends PluginBase implements Listener {
         this.service.start(this.getConfig());
 
         this.scheduleSync();
+    }
+
+    private void suggest(String name, CommandParameter[]... forms) {
+        Command registered = (Command) getCommand(name);
+        if (registered == null) return;
+        registered.getCommandParameters().clear();
+        for (int i = 0; i < forms.length; i++) registered.addCommandParameters("choice" + i, forms[i]);
     }
 
     /** The next round comes at the normal interval, or at the longer one when there is nothing to sync. */
