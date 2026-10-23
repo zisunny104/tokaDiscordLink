@@ -68,7 +68,8 @@ public final class BotCommands implements Listener {
         if (target == null) { reply(name, text("bot.noPlayer")); return; }
         String command = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
         reply(name, text("bot.ranAs", target.getName(), command));
-        plugin.getServer().dispatchCommand(target, command);
+        if (anchorHere()) plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), "anchor run " + target.getName() + " " + command);
+        else plugin.getServer().dispatchCommand(target, command);
     }
 
     private void ser(String name, UUID player, String[] args) {
@@ -81,13 +82,20 @@ public final class BotCommands implements Listener {
             case "kill" -> {
                 Player target = args.length < 3 ? null : plugin.getServer().getPlayerExact(args[2]);
                 if (target == null) { reply(name, text("bot.noPlayer")); return; }
-                target.kill();
+                if (anchorHere()) plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), "anchor kill " + target.getName());
+                else target.kill();
                 reply(name, text("bot.killed", target.getName()));
             }
             case "test" -> reply(name, text("bot.test"));
             default -> { reply(name, text("bot.usage.ser")); return; }
         }
         plugin.getLogger().info(text("bot.logged", name, player, sub));
+    }
+
+    /** The administrator commands are tokaAnchor's; this only sends them on. */
+    private boolean anchorHere() {
+        Plugin anchor = plugin.getServer().getPluginManager().getPlugin("tokaAnchor");
+        return anchor != null && anchor.isEnabled();
     }
 
     /** An operator, or a player with the administrator identity; for a player who is offline LuckPerms is asked. */
