@@ -33,6 +33,7 @@ public final class Main extends PluginBase implements Listener {
     public static final String PERMISSION_ADMIN = "tokaDiscordLink.admin";
 
     private LinkService links;
+    private static volatile Main instance;
     private MemberSync sync;
     private DiscordService service;
     private String disabledReason;
@@ -41,6 +42,13 @@ public final class Main extends PluginBase implements Listener {
     private dev.toka.discord.plan.PlanControl planControl;
 
     /** The texts of the plugin, in the language of {@code language} in config.yml. */
+    /** Whether the commands written in the Discord channel (list, c, ser) are handled here. For zero's hand-over check, by reflection. */
+    public static boolean handlesBotCommands() {
+        return links() != null;
+    }
+
+    private static LinkService links() { return instance == null ? null : instance.links; }
+
     public Messages messages() {
         return this.messages;
     }
@@ -90,6 +98,7 @@ public final class Main extends PluginBase implements Listener {
 
     @Override
     public void onEnable() {
+        instance = this;
         this.saveDefaultConfig();
         suggest("discord",
                 new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"})},
@@ -124,6 +133,7 @@ public final class Main extends PluginBase implements Listener {
             this.links.onChange(linkedGroup::set);
             this.getServer().getScheduler().scheduleDelayedTask(this, () -> linkedGroup.fill(this.links.all().keySet()), 200);
         }
+        this.getServer().getPluginManager().registerEvents(new dev.toka.discord.link.BotCommands(this), this);
         DiscordLink.setIdentityResolver(this.links);
         DiscordLink.setLinkImporter((player, discordUserId) -> {
             if (!discordUserId.matches("\\d{15,25}")) {
@@ -187,6 +197,7 @@ public final class Main extends PluginBase implements Listener {
 
     @Override
     public void onDisable() {
+        if (instance == this) instance = null;
         closePlan();
         if (this.service != null) {
             DiscordLink.unregister(this.service);
