@@ -29,6 +29,7 @@ public final class DiscordService implements DiscordLink.Transport {
     private static final int MAX_TEXT = 2000;
 
     private final Main plugin;
+    private volatile long lastDeleteWarning;
     private final LinkService links;
     private final MemberSync sync;
     private volatile JDA jda;
@@ -202,7 +203,16 @@ public final class DiscordService implements DiscordLink.Transport {
     public void deleteMessage(String messageId, String channel) {
         TextChannel target = this.channelOf(channel);
         if (this.isReady() && target != null) {
-            target.deleteMessageById(messageId).queue(null, error -> { });
+            target.deleteMessageById(messageId).queue(null, error -> {
+                // the reason is shown once per minute at most: a missing "Manage Messages" permission would repeat on every line
+                long now = System.currentTimeMillis();
+                if (now - lastDeleteWarning > 60_000L) {
+                    lastDeleteWarning = now;
+                    this.plugin.getLogger().warning(this.plugin.messages().text("log.deleteFailed", error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage()));
+                }
+            });
+        } else {
+            this.plugin.getLogger().warning(this.plugin.messages().text("log.deleteNotReady"));
         }
     }
 }

@@ -118,6 +118,9 @@ err:
 
 # ---------------------------------------------------------------- 後台日誌（不加方括號標籤，文字 §b、數字 §a、警告 §e、成功 §a）
 log:
+  # ${0}=Discord 回傳的原因
+  deleteFailed: "§e刪除 Discord 原訊息失敗：§a${0}§e（機器人需要「管理訊息」權限）"
+  deleteNotReady: "§e Discord 尚未連線或找不到頻道，原訊息沒有刪除"
   # ${0}=綁定數量
   linksLoaded: "§b載入綁定共 §a${0} §b個"
   storageCopied: "§a綁定資料已從 links 複製到 storage/sqlite，舊的 links 資料夾保留不刪"
