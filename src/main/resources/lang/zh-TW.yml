@@ -18,7 +18,7 @@ cmd:
     # 一般玩家的用法（用法錯誤時顯示，後面會接 usageAdmin）
     usage: "§7用法：/discord link [代碼] | unlink | info | help"
     # 管理員（OP 或後台）額外看到的用法，接在 usage 後面
-    usageAdmin: " | status | reload | plan | link <玩家> <Discord使用者ID> | unlink <玩家> | info <玩家>"
+    usageAdmin: " | status | reload | plan | role | link <玩家> <Discord使用者ID> | unlink <玩家> | info <玩家>"
 
 # ---------------------------------------------------------------- /discord help（第一行是標題）
 help:
@@ -39,6 +39,11 @@ help:
     - "§e/discord link <玩家> <Discord使用者ID> §7- §b替玩家直接綁定（玩家需進過伺服器）"
     - "§e/discord unlink <玩家> §7- §b解除玩家的綁定"
     - "§e/discord info <玩家> §7- §b查看玩家綁定的 Discord 使用者 ID"
+    - "§e/discord role §7- §b查看遊戲權限組與 Discord 身分組的對照"
+    - "§e/discord role set <權限組> <身分組ID> §7- §b新增或修改對照（寫入設定檔）"
+    - "§e/discord role remove <權限組> §7- §b移除對照"
+    - "§e/discord role all §7- §b列出 Discord 伺服器的身分組與 ID"
+    - "§e/discord role sync §7- §b立即把全部綁定玩家同步一次"
     - "§e/discord reload §7- §b重讀設定與語言，機器人重新連線"
     - "§e/discord plan status §7- §b查看 Plan 整合的模式與欄位"
     - "§e/discord plan mode <auto|enable|disable> §7- §b設定 Plan 整合模式"
@@ -107,6 +112,20 @@ msg:
 
 # ---------------------------------------------------------------- 管理視窗（/discord status）
 ui:
+  role:
+    button: "身分組對照"
+    title: "身分組對照"
+    hint: "§7遊戲權限組 → Discord 身分組，只從遊戲同步到 Discord。"
+    back: "§c返回"
+    add: "新增對照"
+    edit: "修改對照"
+    sync: "立即同步"
+    # ${0}=權限組 ${1}=身分組名稱與 ID
+    entry: "${0} → ${1}"
+    group: "權限組名稱"
+    groupHint: "例如 admin"
+    roleId: "Discord 身分組 ID"
+    delete: "§c移除這個對照"
   status:
     title: "Discord 狀態"
     close: "§c關閉"
@@ -119,6 +138,21 @@ ui:
     confirmBody: "要解除 ${0} 的綁定嗎？"
     "yes": "解除"
     "no": "§c取消"
+
+# ---------------------------------------------------------------- 身分組對照（/discord role）
+role:
+  usage: "§e/discord role [list | all | set <權限組> <身分組ID> | remove <權限組> | sync]"
+  # ${0}=對照項數
+  listHead: "§b身分組對照：§a${0} §b項"
+  # ${0}=權限組 ${1}=身分組
+  line: "§e${0} §7→ §b${1}"
+  unknownRole: "§7（機器人看不到這個身分組）"
+  badId: "§c身分組 ID 是一串數字（Discord 開發者模式下對身分組按右鍵可複製）。"
+  set: "§a已設定：§e${0} §7→ §b${1}"
+  removed: "§a已移除 ${0} 的對照。"
+  none: "§c沒有 ${0} 的對照。"
+  syncing: "§a開始同步，會分散在一段時間內完成。"
+  saveFailed: "§c寫入設定檔失敗：${0}"
 
 # ---------------------------------------------------------------- 錯誤與拒絕
 err:

@@ -290,6 +290,13 @@ public final class Main extends PluginBase implements Listener {
                     }
                 }
                 return true;
+            case "role":
+                if (!admin) {
+                    sender.sendMessage(this.messages.text("err.noPermissionStatus"));
+                } else {
+                    this.roleCommand(sender, args);
+                }
+                return true;
             case "link":
                 this.link(sender, args, admin);
                 return true;
@@ -359,14 +366,163 @@ public final class Main extends PluginBase implements Listener {
         var window = new cn.nukkit.form.window.FormWindowSimple(this.messages.text("ui.status.title"), String.join("\n", this.statusLines()));
         window.addButton(Ui.button(this.messages.text("ui.status.link"), "textures/ui/color_plus"));
         window.addButton(Ui.button(this.messages.text("ui.status.unlink"), "textures/ui/cancel"));
+        window.addButton(Ui.button(this.messages.text("ui.role.button"), "textures/ui/dressing_room_customization"));
         window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.status.close")));
         this.ui.show(admin, window, answer -> {
             int id = ((cn.nukkit.form.response.FormResponseSimple) answer).getClickedButtonId();
-            if (id == 0 && this.links != null) {
+            if (id == 2 && this.sync != null) {
+                this.roleWindow(admin);
+            } else if (id == 0 && this.links != null) {
                 this.linkWindow(admin);
             } else if (id == 1 && this.links != null) {
                 this.unlinkWindow(admin);
             }
+        });
+    }
+
+    // ------------------------------------------------------------------ group -> Discord role mapping
+
+    /** Writes the mapping back into config.yml, keeping every comment: only the lines of the {@code roles:} block are replaced. */
+    private void saveRoles() {
+        java.nio.file.Path file = this.getDataFolder().toPath().resolve("config.yml");
+        try {
+            java.util.List<String> lines = new java.util.ArrayList<>(java.nio.file.Files.readAllLines(file, java.nio.charset.StandardCharsets.UTF_8));
+            int start = -1;
+            for (int i = 0; i < lines.size(); i++) {
+                if (lines.get(i).startsWith("roles:")) {
+                    start = i;
+                    break;
+                }
+            }
+            if (start < 0) {
+                return;
+            }
+            int end = start + 1;
+            while (end < lines.size() && (lines.get(end).startsWith(" ") || lines.get(end).startsWith("\t"))) {
+                end++;
+            }
+            java.util.List<String> block = new java.util.ArrayList<>();
+            var mapped = this.sync.roles();
+            if (mapped.isEmpty()) {
+                block.add("roles: {}");
+            } else {
+                block.add("roles:");
+                mapped.forEach((group, role) -> block.add("  " + group + ": \"" + role + "\""));
+            }
+            lines.subList(start, end).clear();
+            lines.addAll(start, block);
+            java.nio.file.Files.write(file, lines, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException failed) {
+            this.getLogger().warning(this.messages.text("role.saveFailed", String.valueOf(failed.getMessage())));
+        }
+    }
+
+    private void roleCommand(CommandSender sender, String[] args) {
+        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "list";
+        switch (action) {
+            case "set" -> {
+                if (args.length < 4) {
+                    sender.sendMessage(this.messages.text("role.usage"));
+                } else {
+                    sender.sendMessage(this.setRole(args[2].toLowerCase(Locale.ROOT), args[3].trim()));
+                }
+            }
+            case "remove" -> {
+                if (args.length < 3) {
+                    sender.sendMessage(this.messages.text("role.usage"));
+                } else {
+                    sender.sendMessage(this.removeRole(args[2].toLowerCase(Locale.ROOT)));
+                }
+            }
+            case "all" -> this.sync.guildRoles().forEach((id, name) -> sender.sendMessage(this.messages.text("role.line", name, id)));
+            case "sync" -> {
+                this.sync.syncAll();
+                sender.sendMessage(this.messages.text("role.syncing"));
+            }
+            default -> {
+                var mapped = this.sync.roles();
+                sender.sendMessage(this.messages.text("role.listHead", mapped.size()));
+                mapped.forEach((group, role) -> sender.sendMessage(this.messages.text("role.line", group, this.roleLabel(role))));
+            }
+        }
+    }
+
+    private String roleLabel(String role) {
+        String name = this.sync.roleName(role);
+        return name == null ? role + this.messages.text("role.unknownRole") : name + " (" + role + ")";
+    }
+
+    private String setRole(String group, String role) {
+        if (!role.matches("\\d{15,25}")) {
+            return this.messages.text("role.badId");
+        }
+        this.sync.setRole(group, role);
+        this.saveRoles();
+        return this.messages.text("role.set", group, this.roleLabel(role));
+    }
+
+    private String removeRole(String group) {
+        if (!this.sync.roles().containsKey(group)) {
+            return this.messages.text("role.none", group);
+        }
+        this.sync.removeRole(group);
+        this.saveRoles();
+        return this.messages.text("role.removed", group);
+    }
+
+    private void roleWindow(Player admin) {
+        var mapped = this.sync.roles();
+        var window = new cn.nukkit.form.window.FormWindowSimple(this.messages.text("ui.role.title"), this.messages.text("ui.role.hint"));
+        window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.role.back")));
+        window.addButton(Ui.button(this.messages.text("ui.role.add"), "textures/ui/color_plus"));
+        window.addButton(Ui.button(this.messages.text("ui.role.sync"), "textures/ui/refresh"));
+        java.util.List<String> groups = new java.util.ArrayList<>(mapped.keySet());
+        for (String group : groups) {
+            window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.role.entry", group, this.roleLabel(mapped.get(group)))));
+        }
+        this.ui.show(admin, window, answer -> {
+            int id = ((cn.nukkit.form.response.FormResponseSimple) answer).getClickedButtonId();
+            if (!admin.hasPermission(PERMISSION_ADMIN)) {
+                return;
+            }
+            if (id == 0) {
+                this.statusWindow(admin);
+            } else if (id == 1) {
+                this.roleEditWindow(admin, "", "");
+            } else if (id == 2) {
+                this.sync.syncAll();
+                admin.sendMessage(this.messages.text("role.syncing"));
+            } else if (id - 3 < groups.size()) {
+                this.roleEditWindow(admin, groups.get(id - 3), mapped.get(groups.get(id - 3)));
+            }
+        });
+    }
+
+    private void roleEditWindow(Player admin, String group, String role) {
+        boolean adding = group.isEmpty();
+        var window = new cn.nukkit.form.window.FormWindowCustom(this.messages.text(adding ? "ui.role.add" : "ui.role.edit"));
+        window.addElement(new cn.nukkit.form.element.ElementInput(this.messages.text("ui.role.group"), this.messages.text("ui.role.groupHint"), group));
+        window.addElement(new cn.nukkit.form.element.ElementInput(this.messages.text("ui.role.roleId"), "", role));
+        if (!adding) {
+            window.addElement(new cn.nukkit.form.element.ElementToggle(this.messages.text("ui.role.delete"), false));
+        }
+        this.ui.show(admin, window, answer -> {
+            var response = (cn.nukkit.form.response.FormResponseCustom) answer;
+            if (!admin.hasPermission(PERMISSION_ADMIN)) {
+                return;
+            }
+            String newGroup = response.getInputResponse(0).trim().toLowerCase(Locale.ROOT);
+            if (!adding && response.getToggleResponse(2)) {
+                admin.sendMessage(this.removeRole(group));
+            } else if (newGroup.isEmpty()) {
+                admin.sendMessage(this.messages.text("role.usage"));
+            } else {
+                if (!adding && !newGroup.equals(group)) {
+                    this.sync.removeRole(group);
+                }
+                admin.sendMessage(this.setRole(newGroup, response.getInputResponse(1).trim()));
+            }
+            this.roleWindow(admin);
         });
     }
 

@@ -35,7 +35,7 @@ public final class MemberSync {
     private final NicknameMode nicknameMode;
     private final String nicknameFormat;
     /** group name in the game -> id of the Discord role */
-    private final Map<String, String> roles = new LinkedHashMap<>();
+    private final Map<String, String> roles = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
 
     private volatile JDA jda;
     private volatile String guildId;
@@ -74,6 +74,38 @@ public final class MemberSync {
 
     public int roleMappings() {
         return this.roles.size();
+    }
+
+    /** The group -> role id pairs now in force (a copy). */
+    public Map<String, String> roles() {
+        synchronized (this.roles) {
+            return new LinkedHashMap<>(this.roles);
+        }
+    }
+
+    /** Every role of the Discord server, id -> name (empty when the bot is not connected). */
+    public Map<String, String> guildRoles() {
+        JDA client = this.jda;
+        Guild guild = client == null || this.guildId == null ? null : client.getGuildById(this.guildId);
+        Map<String, String> found = new LinkedHashMap<>();
+        if (guild != null) guild.getRoles().forEach(role -> { if (!role.isPublicRole() && !role.isManaged()) found.put(role.getId(), role.getName()); });
+        return found;
+    }
+
+    public void setRole(String group, String roleId) {
+        this.roles.put(group, roleId);
+    }
+
+    public void removeRole(String group) {
+        this.roles.remove(group);
+    }
+
+    /** The name of a Discord role, or null when the role is not on the server (or the bot is not connected). */
+    public String roleName(String roleId) {
+        JDA client = this.jda;
+        Guild guild = client == null || this.guildId == null ? null : client.getGuildById(this.guildId);
+        Role role = guild == null || !roleId.matches("\\d{15,25}") ? null : guild.getRoleById(roleId);
+        return role == null ? null : role.getName();
     }
 
     public static String nickname(String format, String name) {
@@ -141,7 +173,7 @@ public final class MemberSync {
             return null;
         }
         Set<String> groups = new HashSet<>();
-        for (String group : this.roles.keySet()) {
+        for (String group : this.roles().keySet()) {
             if (online.hasPermission("group." + group)) {
                 groups.add(group);
             }
@@ -158,7 +190,7 @@ public final class MemberSync {
         if (groups == null) {
             return;
         }
-        for (Map.Entry<String, String> mapping : this.roles.entrySet()) {
+        for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
             Role role = guild.getRoleById(mapping.getValue());
             if (role == null || !guild.getSelfMember().canInteract(role)) {
                 continue;
