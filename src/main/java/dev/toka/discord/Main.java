@@ -357,14 +357,14 @@ public final class Main extends PluginBase implements Listener {
     /** The status as a window; the buttons run the same link and unlink code as the commands. */
     private void statusWindow(Player admin) {
         var window = new cn.nukkit.form.window.FormWindowSimple(this.messages.text("ui.status.title"), String.join("\n", this.statusLines()));
-        window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.status.close")));
         window.addButton(Ui.button(this.messages.text("ui.status.link"), "textures/ui/color_plus"));
         window.addButton(Ui.button(this.messages.text("ui.status.unlink"), "textures/ui/cancel"));
+        window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.status.close")));
         this.ui.show(admin, window, answer -> {
             int id = ((cn.nukkit.form.response.FormResponseSimple) answer).getClickedButtonId();
-            if (id == 1 && this.links != null) {
+            if (id == 0 && this.links != null) {
                 this.linkWindow(admin);
-            } else if (id == 2 && this.links != null) {
+            } else if (id == 1 && this.links != null) {
                 this.unlinkWindow(admin);
             }
         });
