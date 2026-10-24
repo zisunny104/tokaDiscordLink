@@ -37,6 +37,11 @@ public final class LinkCommands extends ListenerAdapter {
         this.ttlMinutes = Math.max(1, ttlSeconds / 60);
     }
 
+    /** Called when the bot stops: the worker of this start ends, so a restart does not leave threads behind. */
+    public void close() {
+        this.worker.shutdown();
+    }
+
     /** The names of the slash commands are fixed; only the descriptions come from the language file. */
     public static List<CommandData> definitions(Messages messages) {
         return List.of(

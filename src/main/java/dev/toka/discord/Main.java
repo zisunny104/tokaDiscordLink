@@ -8,6 +8,7 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.event.EventHandler;
+import cn.nukkit.event.HandlerList;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerJoinEvent;
 import cn.nukkit.plugin.Plugin;
@@ -40,6 +41,8 @@ public final class Main extends PluginBase implements Listener {
     private Messages messages;
     private AutoCloseable plan;
     private dev.toka.discord.plan.PlanControl planControl;
+    private Ui ui = new Ui();
+    private boolean reloading;
 
     public Messages messages() {
         return this.messages;
@@ -90,10 +93,18 @@ public final class Main extends PluginBase implements Listener {
 
     @Override
     public void onEnable() {
+        // A reload runs this again on the same object, so nothing from the last start may be left over
+        this.disabledReason = null;
+        this.service = null;
+        this.links = null;
+        this.sync = null;
+        this.planControl = null;
+        this.ui = new Ui();
         instance = this;
         this.saveDefaultConfig();
         suggest("discord",
-                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"})},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"help"}), CommandParameter.newType("page", true, CommandParamType.INT)},
+                new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"reload"})},
                 new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"info"}), CommandParameter.newType("player", true, CommandParamType.TARGET)},
                 new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"status"})},
                 new CommandParameter[]{CommandParameter.newEnum("action", new String[]{"link"}), CommandParameter.newType("code", true, CommandParamType.STRING)},
@@ -144,6 +155,7 @@ public final class Main extends PluginBase implements Listener {
         });
         this.sync = new MemberSync(this, this.links, this.getConfig());
         this.getServer().getPluginManager().registerEvents(this, this);
+        this.getServer().getPluginManager().registerEvents(this.ui, this);
         refreshPlan();
 
         Plugin one = this.getServer().getPluginManager().getPlugin("one");
@@ -163,7 +175,7 @@ public final class Main extends PluginBase implements Listener {
 
         this.service = new DiscordService(this, this.links, this.sync);
         DiscordLink.register(this.service);
-        this.service.start(this.getConfig());
+        this.service.start(this.getConfig(), !this.reloading);
 
         this.scheduleSync();
     }
@@ -189,11 +201,16 @@ public final class Main extends PluginBase implements Listener {
 
     @Override
     public void onDisable() {
+        this.shutdown(true);
+    }
+
+    /** Stops everything that onEnable started; a reload does it without the goodbye message in the Discord channel. */
+    private void shutdown(boolean farewell) {
         if (instance == this) instance = null;
         closePlan();
         if (this.service != null) {
             DiscordLink.unregister(this.service);
-            this.service.stop(this.getConfig());
+            this.service.stop(farewell ? this.getConfig() : null);
         }
         DiscordLink.setIdentityResolver(null);
         DiscordLink.setLinkImporter(null);
@@ -204,6 +221,21 @@ public final class Main extends PluginBase implements Listener {
                 this.getLogger().warning(this.messages.text("log.linksCloseFailed", e.getMessage()));
             }
         }
+    }
+
+    /** Re-reads config.yml and the texts, then starts again; the bot reconnects but does not announce it. */
+    private void reload(CommandSender sender) {
+        this.shutdown(false);
+        this.getServer().getScheduler().cancelTask(this);
+        HandlerList.unregisterAll((cn.nukkit.plugin.Plugin) this);
+        this.reloadConfig();
+        this.reloading = true;
+        try {
+            this.onEnable();
+        } finally {
+            this.reloading = false;
+        }
+        sender.sendMessage(this.messages.text("msg.reloaded"));
     }
 
     @EventHandler
@@ -228,6 +260,14 @@ public final class Main extends PluginBase implements Listener {
         if(planControl!=null&&planControl.command(sender,args,PERMISSION_ADMIN))return true;
         String sub = args.length == 0 ? "info" : args[0].toLowerCase(Locale.ROOT);
         boolean admin = sender.hasPermission(PERMISSION_ADMIN) || !(sender instanceof Player);
+        if (sub.equals("reload")) {
+            if (admin) {
+                this.reload(sender);
+            } else {
+                sender.sendMessage(this.messages.text("err.noPermissionStatus"));
+            }
+            return true;
+        }
         if (this.links == null && !sub.equals("status") && !sub.equals("help")) {
             sender.sendMessage(this.messages.text("err.bindingUnavailable", this.disabledReason));
             return true;
@@ -235,21 +275,20 @@ public final class Main extends PluginBase implements Listener {
 
         switch (sub) {
             case "help":
-                for (String line : this.messages.lines("help.discord")) {
-                    sender.sendMessage(line);
-                }
-                if (admin) {
-                    for (String line : this.messages.lines("help.discordAdmin")) {
-                        sender.sendMessage(line);
-                    }
-                }
+                this.helpPage(sender, admin, args.length > 1 ? args[1] : "");
                 return true;
             case "status":
                 if (!admin) {
                     sender.sendMessage(this.messages.text("err.noPermissionStatus"));
                     return true;
                 }
-                this.status(sender);
+                if (sender instanceof Player self) {
+                    this.statusWindow(self);
+                } else {
+                    for (String line : this.statusLines()) {
+                        sender.sendMessage(line);
+                    }
+                }
                 return true;
             case "link":
                 this.link(sender, args, admin);
@@ -267,7 +306,29 @@ public final class Main extends PluginBase implements Listener {
         }
     }
 
-    private void status(CommandSender sender) {
+    /** Chat help in pages of six lines; the first page is what every player uses, the administrator lines follow. */
+    private void helpPage(CommandSender sender, boolean admin, String requested) {
+        java.util.List<String> lines = new java.util.ArrayList<>(this.messages.lines("help.discord"));
+        lines.remove(0);
+        if (admin) {
+            lines.addAll(this.messages.lines("help.discordAdmin"));
+        }
+        int pages = Math.max(1, (lines.size() + 5) / 6);
+        int page;
+        try {
+            page = Integer.parseInt(requested);
+        } catch (NumberFormatException first) {
+            page = 1;
+        }
+        page = Math.max(1, Math.min(page, pages));
+        sender.sendMessage(this.messages.text("help.head", page, pages));
+        for (String line : lines.subList((page - 1) * 6, Math.min(lines.size(), page * 6))) {
+            sender.sendMessage(line);
+        }
+    }
+
+    private java.util.List<String> statusLines() {
+        java.util.List<String> lines = new java.util.ArrayList<>();
         String state;
         if (this.service == null) {
             state = this.messages.text("status.disabled", this.disabledReason);
@@ -278,18 +339,65 @@ public final class Main extends PluginBase implements Listener {
         } else {
             state = this.messages.text("status.connecting");
         }
-        sender.sendMessage(this.messages.text("msg.status.discord", state));
+        lines.add(this.messages.text("msg.status.discord", state));
         if (this.service != null && this.service.isReady()) {
-            sender.sendMessage(this.messages.text("msg.status.msgChannel", this.service.describeChannel(DiscordLink.MSG_CHANNEL)));
-            sender.sendMessage(this.messages.text("msg.status.cmdChannel", this.service.describeChannel(DiscordLink.CMD_CHANNEL)));
+            lines.add(this.messages.text("msg.status.msgChannel", this.service.describeChannel(DiscordLink.MSG_CHANNEL)));
+            lines.add(this.messages.text("msg.status.cmdChannel", this.service.describeChannel(DiscordLink.CMD_CHANNEL)));
         }
         if (this.links != null) {
-            sender.sendMessage(this.messages.text("msg.status.linked", this.links.count()));
-            sender.sendMessage(this.messages.text("msg.status.nickname", this.sync.nicknameMode().name().toLowerCase(Locale.ROOT),
+            lines.add(this.messages.text("msg.status.linked", String.format(Locale.ROOT, "%,d", this.links.count())));
+            lines.add(this.messages.text("msg.status.nickname", this.sync.nicknameMode().name().toLowerCase(Locale.ROOT),
                     this.sync.roleMappings(),
                     this.sync.roleMappings() == 0 ? this.messages.text("status.rolesEmpty") : ""));
         }
-        sender.sendMessage(this.messages.text("msg.status.permission"));
+        lines.add(this.messages.text("msg.status.permission"));
+        return lines;
+    }
+
+    /** The status as a window; the buttons run the same link and unlink code as the commands. */
+    private void statusWindow(Player admin) {
+        var window = new cn.nukkit.form.window.FormWindowSimple(this.messages.text("ui.status.title"), String.join("\n", this.statusLines()));
+        window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.status.close")));
+        window.addButton(Ui.button(this.messages.text("ui.status.link"), "textures/ui/color_plus"));
+        window.addButton(Ui.button(this.messages.text("ui.status.unlink"), "textures/ui/cancel"));
+        this.ui.show(admin, window, answer -> {
+            int id = ((cn.nukkit.form.response.FormResponseSimple) answer).getClickedButtonId();
+            if (id == 1 && this.links != null) {
+                this.linkWindow(admin);
+            } else if (id == 2 && this.links != null) {
+                this.unlinkWindow(admin);
+            }
+        });
+    }
+
+    private void linkWindow(Player admin) {
+        var window = new cn.nukkit.form.window.FormWindowCustom(this.messages.text("ui.status.link"));
+        window.addElement(new cn.nukkit.form.element.ElementInput(this.messages.text("ui.status.player"), "", ""));
+        window.addElement(new cn.nukkit.form.element.ElementInput(this.messages.text("ui.status.discordId"), "", ""));
+        this.ui.show(admin, window, answer -> {
+            var response = (cn.nukkit.form.response.FormResponseCustom) answer;
+            if (admin.hasPermission(PERMISSION_ADMIN)) {
+                this.link(admin, new String[]{"link", response.getInputResponse(0).trim(), response.getInputResponse(1).trim()}, true);
+            }
+        });
+    }
+
+    private void unlinkWindow(Player admin) {
+        var window = new cn.nukkit.form.window.FormWindowCustom(this.messages.text("ui.status.unlink"));
+        window.addElement(new cn.nukkit.form.element.ElementInput(this.messages.text("ui.status.player"), "", ""));
+        this.ui.show(admin, window, answer -> {
+            String name = ((cn.nukkit.form.response.FormResponseCustom) answer).getInputResponse(0).trim();
+            if (name.isEmpty()) {
+                return;
+            }
+            var confirm = new cn.nukkit.form.window.FormWindowModal(this.messages.text("ui.status.confirmTitle"),
+                    this.messages.text("ui.status.confirmBody", name), this.messages.text("ui.status.yes"), this.messages.text("ui.status.no"));
+            this.ui.show(admin, confirm, reply -> {
+                if (((cn.nukkit.form.response.FormResponseModal) reply).getClickedButtonId() == 0 && admin.hasPermission(PERMISSION_ADMIN)) {
+                    this.unlink(admin, new String[]{"unlink", name}, true);
+                }
+            });
+        });
     }
 
     private void link(CommandSender sender, String[] args, boolean admin) {

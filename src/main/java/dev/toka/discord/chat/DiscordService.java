@@ -38,6 +38,7 @@ public final class DiscordService implements DiscordLink.Transport {
     private volatile TextChannel msgChannel;
     private volatile TextChannel cmdChannel;
     private volatile String failure;
+    private volatile LinkCommands linkCommands;
 
     public DiscordService(Main plugin, LinkService links, MemberSync sync) {
         this.plugin = plugin;
@@ -61,16 +62,16 @@ public final class DiscordService implements DiscordLink.Transport {
     }
 
     /** Connects in the background, so that the server does not wait for Discord. */
-    public void start(Config config) {
+    public void start(Config config, boolean announce) {
         this.stopping = false;
         this.failure = null;
         String token = config.getString("token", "").trim();
-        Thread worker = new Thread(() -> this.connect(config, token), "tokaDiscordLink-connect");
+        Thread worker = new Thread(() -> this.connect(config, token, announce), "tokaDiscordLink-connect");
         worker.setDaemon(true);
         worker.start();
     }
 
-    private void connect(Config config, String token) {
+    private void connect(Config config, String token, boolean announce) {
         try {
             // JDA looks for its SLF4J provider through the context class loader, which on the server is not the plugin's
             Thread.currentThread().setContextClassLoader(DiscordService.class.getClassLoader());
@@ -100,7 +101,9 @@ public final class DiscordService implements DiscordLink.Transport {
             client.addEventListener(new DiscordListener(this.plugin, this, config, this.sync));
             this.registerLinkCommands(client, config);
             this.ready = true;
-            this.sendEmbed(config.getString("bot-start-msg", ""), config.getString("bot-start-color", ""), DiscordLink.MSG_CHANNEL);
+            if (announce) {
+                this.sendEmbed(config.getString("bot-start-msg", ""), config.getString("bot-start-color", ""), DiscordLink.MSG_CHANNEL);
+            }
             this.plugin.getLogger().info(this.plugin.messages().text("log.connected", client.getSelfUser().getName()));
         } catch (Exception | LinkageError e) {
             this.ready = false;
@@ -124,7 +127,9 @@ public final class DiscordService implements DiscordLink.Transport {
             return;
         }
         this.sync.attach(client, channel.getGuild().getId());
-        client.addEventListener(new LinkCommands(this.plugin.messages(), this.links, this.sync, config.getInt("link.code-ttl-seconds", 600)));
+        LinkCommands commands = new LinkCommands(this.plugin.messages(), this.links, this.sync, config.getInt("link.code-ttl-seconds", 600));
+        this.linkCommands = commands;
+        client.addEventListener(commands);
         channel.getGuild().updateCommands().addCommands(LinkCommands.definitions(this.plugin.messages()))
                 .queue(null, error -> this.plugin.getLogger().warning(this.plugin.messages().text("log.registerFailed", error.getMessage())));
     }
@@ -159,6 +164,11 @@ public final class DiscordService implements DiscordLink.Transport {
                     Thread.currentThread().interrupt();
                     client.shutdownNow();
                 }
+            }
+            LinkCommands commands = this.linkCommands;
+            if (commands != null) {
+                commands.close();
+                this.linkCommands = null;
             }
             this.msgChannel = null;
             this.cmdChannel = null;

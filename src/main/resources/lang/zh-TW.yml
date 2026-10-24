@@ -18,10 +18,12 @@ cmd:
     # 一般玩家的用法（用法錯誤時顯示，後面會接 usageAdmin）
     usage: "§7用法：/discord link [代碼] | unlink | info | help"
     # 管理員（OP 或後台）額外看到的用法，接在 usage 後面
-    usageAdmin: " | status | link <玩家> <Discord使用者ID> | unlink <玩家> | info <玩家>"
+    usageAdmin: " | status | reload | plan | link <玩家> <Discord使用者ID> | unlink <玩家> | info <玩家>"
 
 # ---------------------------------------------------------------- /discord help（第一行是標題）
 help:
+  # ${0} = 頁、${1} = 總頁數
+  head: "§6=== §f§l/discord 說明§r §6第 §a${0}§6/§a${1}§6 頁，/discord help <頁> ==="
   # 所有人看得到的說明
   discord:
     - "§6=== §f§l/discord 說明§r §6==="
@@ -30,12 +32,18 @@ help:
     - "§e/discord link §7- §b產生綁定代碼，到 Discord 輸入 /link code:代碼 完成綁定"
     - "§e/discord link <代碼> §7- §b輸入 Discord 的 /link 給您的代碼完成綁定"
     - "§e/discord unlink §7- §b解除自己的綁定"
+    - "§7權限：§atokaDiscordLink.use §7綁定、解除與查看自己的帳號（預設所有人）"
   # 管理員（OP 或後台）另外看到的說明
   discordAdmin:
     - "§e/discord status §7- §b查看機器人連線、頻道與綁定狀態"
     - "§e/discord link <玩家> <Discord使用者ID> §7- §b替玩家直接綁定（玩家需進過伺服器）"
     - "§e/discord unlink <玩家> §7- §b解除玩家的綁定"
     - "§e/discord info <玩家> §7- §b查看玩家綁定的 Discord 使用者 ID"
+    - "§e/discord reload §7- §b重讀設定與語言，機器人重新連線"
+    - "§e/discord plan status §7- §b查看 Plan 整合的模式與欄位"
+    - "§e/discord plan mode <auto|enable|disable> §7- §b設定 Plan 整合模式"
+    - "§e/discord plan fields <all|none|bound> §7- §b選擇送給 Plan 的欄位"
+    - "§7權限：§atokaDiscordLink.admin §7使用 status、reload、plan 與替他人綁定（預設 OP）"
 
 # ---------------------------------------------------------------- 遊戲內訊息
 # Discord 訊息頻道裡的指令（list、c、ser）。${0}…依各行說明
@@ -55,7 +63,7 @@ bot:
   killed: "[伺服]已讓 ${0} 死亡"
   test: "指令測試"
   # 後台紀錄；${0}=Discord 名稱、${1}=玩家 UUID、${2}=指令
-  logged: "[Discord 指令] ${0}（${1}）執行 ser ${2}"
+  logged: "§b${0}（§a${1}§b）從 Discord 執行 ser §a${2}"
 msg:
   link:
     # 用法（玩家）
@@ -82,6 +90,7 @@ msg:
     notLinked: "§b尚未綁定 Discord。輸入 §a/discord link§b 開始。"
     # ${0}=Discord 使用者 ID
     linked: "§b已綁定 Discord 使用者 ID：§a${0}"
+  reloaded: "§a已重讀設定與語言，機器人重新連線"
   # /discord status 的各行
   status:
     # ${0}=狀態字（見 status.ready 等）
@@ -95,6 +104,21 @@ msg:
     # ${0}=暱稱管理模式代碼（off／set／enforce，設定值不翻譯） ${1}=身分組對照項數 ${2}=空的時候的補充（status.rolesEmpty）或空字串
     nickname: "§b暱稱管理：§a${0}§b；身分組對照：§a${1} §b項${2}"
     permission: "§7權限串接：等待中（目前管理操作只認 OP；新的權限組確定後再接）"
+
+# ---------------------------------------------------------------- 管理視窗（/discord status）
+ui:
+  status:
+    title: "Discord 狀態"
+    close: "§c關閉"
+    link: "綁定玩家"
+    unlink: "解除綁定"
+    player: "玩家名稱"
+    discordId: "Discord 使用者 ID"
+    confirmTitle: "確認解除"
+    # ${0} = 玩家名稱
+    confirmBody: "要解除 ${0} 的綁定嗎？"
+    "yes": "解除"
+    "no": "§c取消"
 
 # ---------------------------------------------------------------- 錯誤與拒絕
 err:
@@ -132,7 +156,7 @@ log:
   # ${0}=停用原因（見 status.reason.*）
   disabled: "§eDiscord 串聯停用：${0}"
   # ${0}=機器人名稱
-  connected: "§aDiscord 已連線：${0}"
+  connected: "§bDiscord 已連線：§a${0}"
   # ${0}=失敗原因 ${1}=提示（status.intentHint）或空字串
   notReady: "§eDiscord 未就緒：${0}${1}"
   noChannelForCommands: "§e沒有聊天頻道，/link 與 /unlink 沒有註冊"
@@ -201,13 +225,13 @@ discord:
   unknownCommand: "`%name`不明的指令:%msg"
 
 plan:
-  missing: '已要求啟用 Plan，但 Plan 尚未就緒；/${0} plan mode auto 可改為自動偵測。'
-  detected: '已偵測到 Plan，目前模式 ${0}；/${1} plan status 可查看設定。'
-  configureFailed: 'Plan 設定未完成：${0}。'
+  missing: '§e已要求啟用 Plan，但 Plan 尚未就緒；§a/${0} plan mode auto§e 可改為自動偵測'
+  detected: '§b已偵測到 Plan，模式 §a${0}§b；§a/${1} plan status§b 可查看設定'
+  configureFailed: '§ePlan 設定未完成：§a${0}'
   noPermission: '§c沒有管理 Plan 展示的權限。'
   configured: '§aPlan 設定已儲存；/${0} plan status 可查看。'
   usage: '§e/${0} plan status | mode <auto|enable|disable> | fields <all|none|欄位...>'
   bound: '已綁定 Discord'
-  ready: 'Plan 綁定資訊整合已啟用。'
-  unsupported: 'Plan 缺少 DataExtension Builder API，已略過綁定資訊整合。'
-  unavailable: 'Plan 綁定資訊整合暫時不可用：${0}'
+  ready: '§bPlan 綁定資訊整合已啟用'
+  unsupported: '§ePlan 缺少 DataExtension Builder API，略過綁定資訊整合'
+  unavailable: '§ePlan 綁定資訊暫時不可用：§a${0}'
