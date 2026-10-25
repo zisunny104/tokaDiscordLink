@@ -192,16 +192,34 @@ public final class MemberSync {
         }
         for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
             Role role = guild.getRoleById(mapping.getValue());
-            if (role == null || !guild.getSelfMember().canInteract(role)) {
+            if (role == null) {
+                this.complain("log.roleMissing", mapping.getValue(), mapping.getKey());
+                continue;
+            }
+            if (!guild.getSelfMember().canInteract(role)) {
+                this.complain("log.roleAbove", role.getName(), mapping.getKey());
                 continue;
             }
             boolean should = groups.contains(mapping.getKey());
             boolean has = member.getRoles().contains(role);
             if (should && !has) {
-                guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(null, error -> { });
+                guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(
+                        done -> this.plugin.getLogger().info(this.plugin.messages().text("log.roleAdded", role.getName(), member.getEffectiveName())),
+                        error -> this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage())));
             } else if (!should && has) {
-                guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(null, error -> { });
+                guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(
+                        done -> this.plugin.getLogger().info(this.plugin.messages().text("log.roleRemoved", role.getName(), member.getEffectiveName())),
+                        error -> this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage())));
             }
+        }
+    }
+
+    private final Set<String> complained = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** A problem with a role is told once in the log (until the next reload), not on every round of the sync. */
+    private void complain(String key, String first, String second) {
+        if (this.complained.add(key + first + second)) {
+            this.plugin.getLogger().warning(this.plugin.messages().text(key, first, second));
         }
     }
 
