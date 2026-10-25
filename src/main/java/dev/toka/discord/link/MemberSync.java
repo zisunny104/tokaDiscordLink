@@ -124,6 +124,7 @@ public final class MemberSync {
         this.guildId = guildId;
     }
 
+    // TODO: reserved for another plugin that supplies the shown name (e.g. with a title)
     /** Another plugin can supply the name to show, for example one with a title in front of it. */
     public void setNameProvider(Function<UUID, String> provider) {
         this.nameProvider = provider;
