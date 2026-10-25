@@ -7,6 +7,8 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 - **機器人連線**：填入令牌與頻道後，機器人會連上 Discord，並在開服與關服時於聊天頻道發出提示。
 - **帳號綁定**：玩家與 Discord 帳號一對一綁定，用一次性代碼確認，代碼預設 10 分鐘有效，連續輸入錯誤會暫時鎖定。
 - **暱稱同步**：綁定後，Discord 暱稱會改成遊戲名稱，之後定期更新。
+- **身分組同步**：遊戲裡的權限群組可對應到 Discord 身分組，單向從遊戲同步到 Discord（見下方「身分組對照」）。
+- **Discord 是邀請，不是必要條件**：綁定只用來同步暱稱與身分組、串接聊天；是否要求綁定才能進服，由 tokaAnchor 的登入限制決定，不在本插件。
 - **供其他插件使用**：聊天頻道的訊息與指令會轉成事件；一般訊息也可透過不暴露事件類別的 callback 串接，避免不同外掛 classloader 的事件型別衝突。其他插件也能透過 API 把訊息送到 Discord。本插件本身不轉送遊戲聊天。
 
 ## 玩家指令
@@ -25,7 +27,8 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 
 | 指令 | 用法 | 說明 | 權限 |
 | --- | --- | --- | --- |
-| `/discord status` | `/discord status` | 查看機器人連線、頻道與綁定狀態 | `tokaDiscordLink.admin` |
+| `/discord status` | `/discord status` | 查看機器人連線、頻道、綁定與身分組對照狀態；玩家執行時開啟管理視窗（綁定、解除綁定、身分組對照） | `tokaDiscordLink.admin` |
+| `/discord role` | `/discord role [list｜all｜set <權限組> <身分組ID>｜remove <權限組>｜sync]` | 見下方「身分組對照」 | `tokaDiscordLink.admin` |
 | `/discord link` | `/discord link <玩家> <Discord使用者ID>` | 替已進過伺服器的玩家綁定 | `tokaDiscordLink.admin` |
 | `/discord unlink` | `/discord unlink <玩家>` | 解除玩家的綁定 | `tokaDiscordLink.admin` |
 | `/discord info` | `/discord info <玩家>` | 查看玩家綁定的 Discord 使用者 ID | `tokaDiscordLink.admin` |
@@ -51,9 +54,28 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 | `link.max-attempts`、`link.lockout-seconds` | `5`、`600` | 錯誤次數上限與鎖定秒數 |
 | `nickname.mode` | `set` | `off` 不管暱稱；`set` 綁定時與定期同步；`enforce` 另在對方改回時立刻改回來 |
 | `nickname.format` | `{name}` | 暱稱格式，`{name}` 為遊戲名稱，最長 32 字元 |
-| `roles` | 空 | 權限群組對應 Discord 身分組 ID，目前預設不動身分組 |
+| `roles` | 空 | 權限群組對應 Discord 身分組 ID；空的時候不更動任何身分組 |
 | `sync-interval-seconds` | `300` | 暱稱同步間隔，至少 60 |
 | `sync-interval-idle-seconds` | `1800` | 沒有可同步內容時的間隔，不小於上一項 |
+
+## 身分組對照
+
+`config.yml` 的 `roles:` 列出「遊戲權限群組 -> Discord 身分組 ID」，例如 `admin: "123456789012345678"`。規則：
+
+- **單向**：只從遊戲同步到 Discord，只會增減 `roles` 列出的身分組，其他身分組不動。
+- 玩家在線且擁有 `group.<群組>` 權限時加上身分組，沒有時移除；玩家離線時不會被移除任何身分組。綁定時、定期同步與 `/discord role sync` 都會對齊。
+- `roles` 是空的就不更動任何身分組；機器人需要「管理身分組」權限，且角色要高於被管理的身分組。
+- 找不到身分組、機器人角色太低或增減失敗時，結果寫進後台記錄（同一個問題在下次重新載入前只提示一次）；加上與移除身分組也會記錄。
+
+| 指令 | 說明 |
+| --- | --- |
+| `/discord role`、`/discord role list` | 列出目前的對照 |
+| `/discord role all` | 列出 Discord 伺服器的身分組與 ID（身分組 ID 為 15 到 25 位數字） |
+| `/discord role set <權限組> <身分組ID>` | 新增或修改對照，寫回 `config.yml` 並保留註解 |
+| `/discord role remove <權限組>` | 移除對照 |
+| `/discord role sync` | 立即把全部綁定玩家同步一次 |
+
+管理視窗從 `/discord status` 進入，「身分組對照」頁可新增、編輯、刪除對照並立即同步。
 
 ## 串接
 
@@ -77,11 +99,11 @@ Discord 機器人連線、帳號綁定與暱稱同步，串接頻道訊息與指
 - **暱稱沒有變？** 檢查機器人是否有「管理暱稱」權限，且角色比對方高。
 - **綁定代碼無效？** 代碼只能用一次且會過期，連續錯誤會暫時鎖定。
 
-### Plan 選用整合（0.3.3）
+### Plan 選用整合
 
 預設自動接入 Plan，提供 `bound`（玩家是否綁定 Discord）的布林狀態，不公開 Discord ID、名稱、群組、權杖或驗證碼。資料來自成功儲存後發布的 immutable 綁定存在快照，Provider 不取得儲存鎖、不讀磁碟/玩家/Discord 網路。機器人未啟動仍可展示已有的本機綁定。
 
-使用官方 Plan API5.7-R0.2 provided，核對 Plan5.8 build3638 Builder API。Plan 缺少/停用/能力不足自動略過；支援啟用停用及插件卸載。Plan 模式與欄位可用下列管理指令即時套用，欄位走 tokaI18n `plan`。Plan 網頁權限與歷史資料由 Plan 管理；停用整合不會刪除已保存的狀態。
+使用官方 Plan API（provided）。Plan 缺少/停用/能力不足自動略過；支援啟用停用及插件卸載。Plan 模式與欄位可用下列管理指令即時套用，欄位走 tokaI18n `plan`。Plan 網頁權限與歷史資料由 Plan 管理；停用整合不會刪除已保存的狀態。
 
 
 ### Plan 模式與管理指令
