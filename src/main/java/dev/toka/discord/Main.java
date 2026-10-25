@@ -434,6 +434,11 @@ public final class Main extends PluginBase implements Listener {
                     sender.sendMessage(this.removeRole(args[2].toLowerCase(Locale.ROOT)));
                 }
             }
+            case "check" -> {
+                sender.sendMessage(this.messages.text("role.checking"));
+                this.sync.check(difference -> sender.sendMessage(this.messages.text("role.difference", difference[0], difference[1],
+                        this.messages.text(Boolean.parseBoolean(difference[2]) ? "role.gameOnly" : "role.discordOnly"))));
+            }
             case "all" -> this.sync.guildRoles().forEach((id, name) -> sender.sendMessage(this.messages.text("role.line", name, id)));
             case "sync" -> {
                 this.sync.syncAll();

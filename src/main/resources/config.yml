@@ -79,6 +79,12 @@ nickname:
 #   admin: "123456789012345678"
 roles: {}
 
+# 身分組怎麼同步：遊戲為主，Discord 只被動跟著
+#   sync：依遊戲裡的權限組增減（預設）
+#   add：只加不減，Discord 上手動給的身分組不會被拿掉
+#   check：完全不更動，只能用 /discord role check 查看差異，由管理員手動維護
+role-mode: sync
+
 # 暱稱與身分組的定期同步間隔（秒），至少 60
 sync-interval-seconds: 300
 # 沒有可同步的內容（無綁定帳號，或暱稱與身分組都不管理）時改用的間隔（秒），不會小於上一項

@@ -43,6 +43,7 @@ help:
     - "§e/discord role set <權限組> <身分組ID> §7- §b新增或修改對照（寫入設定檔）"
     - "§e/discord role remove <權限組> §7- §b移除對照"
     - "§e/discord role all §7- §b列出 Discord 伺服器的身分組與 ID"
+    - "§e/discord role check §7- §b只檢查不更動：列出 Discord 身分組和遊戲權限組不一致的人"
     - "§e/discord role sync §7- §b立即把全部綁定玩家同步一次"
     - "§e/discord reload §7- §b重讀設定與語言，機器人重新連線"
     - "§e/discord plan status §7- §b查看 Plan 整合的模式與欄位"
@@ -141,7 +142,12 @@ ui:
 
 # ---------------------------------------------------------------- 身分組對照（/discord role）
 role:
-  usage: "§e/discord role [list | all | set <權限組> <身分組ID> | remove <權限組> | sync]"
+  checking: "§b檢查中，只看在線的已綁定玩家，不會更動任何身分組。有差異的人會一行一行列出。"
+  # ${0}=玩家 ${1}=身分組 ${2}=差異（gameOnly／discordOnly）
+  difference: "§e${0} §7身分組 §b${1}§7：${2}"
+  gameOnly: "遊戲有，Discord 沒有"
+  discordOnly: "遊戲沒有，Discord 有"
+  usage: "§e/discord role [list | all | check | set <權限組> <身分組ID> | remove <權限組> | sync]"
   # ${0}=對照項數
   listHead: "§b身分組對照：§a${0} §b項"
   # ${0}=權限組 ${1}=身分組

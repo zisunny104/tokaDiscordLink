@@ -33,6 +33,8 @@ public final class MemberSync {
     private final Main plugin;
     private final LinkService links;
     private final NicknameMode nicknameMode;
+    /** sync: the game decides, roles are added and taken away; add: roles are only added; check: nothing is changed, only /discord role check reports */
+    private final String roleMode;
     private final String nicknameFormat;
     /** group name in the game -> id of the Discord role */
     private final Map<String, String> roles = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
@@ -46,6 +48,8 @@ public final class MemberSync {
         this.links = links;
         this.nicknameMode = parseMode(config.getString("nickname.mode", "set"));
         this.nicknameFormat = config.getString("nickname.format", "{name}");
+        String mode = config.getString("role-mode", "sync").trim().toLowerCase(java.util.Locale.ROOT);
+        this.roleMode = mode.equals("add") || mode.equals("check") ? mode : "sync";
         Object mapped = config.get("roles");
         if (mapped instanceof Map) {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) mapped).entrySet()) {
@@ -202,15 +206,48 @@ public final class MemberSync {
             }
             boolean should = groups.contains(mapping.getKey());
             boolean has = member.getRoles().contains(role);
-            if (should && !has) {
+            if (should && !has && !this.roleMode.equals("check")) {
                 guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(
                         done -> this.plugin.getLogger().info(this.plugin.messages().text("log.roleAdded", role.getName(), member.getEffectiveName())),
                         error -> this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage())));
-            } else if (!should && has) {
+            } else if (!should && has && this.roleMode.equals("sync")) {
                 guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(
                         done -> this.plugin.getLogger().info(this.plugin.messages().text("log.roleRemoved", role.getName(), member.getEffectiveName())),
                         error -> this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage())));
             }
+        }
+    }
+
+    /**
+     * Reads, changes nothing: for every linked player who is online, tells where the roles on Discord differ from the groups in the game.
+     * The lines come back on the server thread.
+     */
+    public void check(java.util.function.Consumer<String[]> out) {
+        JDA client = this.jda;
+        Guild guild = client == null || this.guildId == null ? null : client.getGuildById(this.guildId);
+        if (guild == null) {
+            return;
+        }
+        for (Map.Entry<UUID, String> link : this.links.all().entrySet()) {
+            Set<String> groups = this.currentGroups(link.getKey());
+            if (groups == null) {
+                continue;
+            }
+            String name = this.nameOf(link.getKey());
+            guild.retrieveMemberById(link.getValue()).queue(member -> {
+                for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
+                    Role role = guild.getRoleById(mapping.getValue());
+                    if (role == null) {
+                        continue;
+                    }
+                    boolean should = groups.contains(mapping.getKey());
+                    boolean has = member.getRoles().contains(role);
+                    if (should != has) {
+                        String[] difference = {name, role.getName(), String.valueOf(should), String.valueOf(has)};
+                        this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> out.accept(difference));
+                    }
+                }
+            }, error -> { });
         }
     }
 
