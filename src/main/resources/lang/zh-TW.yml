@@ -117,7 +117,7 @@ ui:
     button: "身分組對照"
     title: "身分組對照"
     hint: "§7遊戲權限組 → Discord 身分組，只從遊戲同步到 Discord。"
-    back: "§c返回"
+    back: "返回"
     add: "新增對照"
     edit: "修改對照"
     sync: "立即同步"
@@ -153,6 +153,8 @@ role:
   # ${0}=權限組 ${1}=身分組
   line: "§e${0} §7→ §b${1}"
   unknownRole: "§7（機器人看不到這個身分組）"
+  # 按鈕列用的同一句，不加色碼
+  unknownRole_btn: "（機器人看不到這個身分組）"
   badId: "§c身分組 ID 是一串數字（Discord 開發者模式下對身分組按右鍵可複製）。"
   set: "§a已設定：§e${0} §7→ §b${1}"
   removed: "§a已移除 ${0} 的對照。"

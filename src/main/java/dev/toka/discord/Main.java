@@ -453,8 +453,12 @@ public final class Main extends PluginBase implements Listener {
     }
 
     private String roleLabel(String role) {
+        return this.roleLabel(role, "role.unknownRole");
+    }
+
+    private String roleLabel(String role, String unknownKey) {
         String name = this.sync.roleName(role);
-        return name == null ? role + this.messages.text("role.unknownRole") : name + " (" + role + ")";
+        return name == null ? role + this.messages.text(unknownKey) : name + " (" + role + ")";
     }
 
     private String setRole(String group, String role) {
@@ -483,7 +487,7 @@ public final class Main extends PluginBase implements Listener {
         window.addButton(Ui.button(this.messages.text("ui.role.sync"), "textures/ui/refresh"));
         java.util.List<String> groups = new java.util.ArrayList<>(mapped.keySet());
         for (String group : groups) {
-            window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.role.entry", group, this.roleLabel(mapped.get(group)))));
+            window.addButton(new cn.nukkit.form.element.ElementButton(this.messages.text("ui.role.entry", group, this.roleLabel(mapped.get(group), "role.unknownRole_btn"))));
         }
         this.ui.show(admin, window, answer -> {
             int id = ((cn.nukkit.form.response.FormResponseSimple) answer).getClickedButtonId();
