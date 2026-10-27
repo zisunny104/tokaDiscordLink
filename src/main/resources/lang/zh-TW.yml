@@ -81,7 +81,7 @@ msg:
     # 產生代碼 ${0}=代碼 ${1}=有效分鐘數
     code: "§b您的綁定代碼：§a${0}§b（§a${1} §b分鐘內有效，只能用一次）"
     # 產生代碼的提示 ${0}=代碼
-    codeHint: "§b到 Discord 輸入：§a/link code:${0}§b　不要把代碼給任何人。"
+    codeHint: "§b到 Discord 輸入：§a/link code:${0}§b 不要把代碼給任何人。"
     # Discord 機器人還沒就緒時的提醒
     botNotReady: "§eDiscord 機器人尚未就緒。"
     # 綁定完成 ${0}=玩家名稱（查不到名稱時是 UUID）
