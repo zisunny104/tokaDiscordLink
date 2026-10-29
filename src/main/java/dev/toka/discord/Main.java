@@ -435,14 +435,18 @@ public final class Main extends PluginBase implements Listener {
                 }
             }
             case "check" -> {
-                sender.sendMessage(this.messages.text("role.checking"));
+                sender.sendMessage(this.messages.text("role.checking", this.sync.accounts()));
                 this.sync.check(difference -> sender.sendMessage(this.messages.text("role.difference", difference[0], difference[1],
-                        this.messages.text(Boolean.parseBoolean(difference[2]) ? "role.gameOnly" : "role.discordOnly"))));
+                        this.messages.text(Boolean.parseBoolean(difference[2]) ? "role.gameOnly" : "role.discordOnly"))),
+                        report -> sender.sendMessage(this.messages.text("role.checked", report.accounts.get(), report.differences.get(),
+                                report.unknownGroups.get(), report.notFound.get())));
             }
             case "all" -> this.sync.guildRoles().forEach((id, name) -> sender.sendMessage(this.messages.text("role.line", name, id)));
             case "sync" -> {
-                this.sync.syncAll();
-                sender.sendMessage(this.messages.text("role.syncing"));
+                int accounts = this.sync.accounts();
+                sender.sendMessage(this.messages.text("role.syncing", accounts, Math.max(1, accounts / 2)));
+                this.sync.syncAll(report -> sender.sendMessage(this.messages.text("role.synced", report.accounts.get(), report.added.get(),
+                        report.removed.get(), report.nicknames.get(), report.notFound.get(), report.unknownGroups.get(), report.failed.get())));
             }
             default -> {
                 var mapped = this.sync.roles();

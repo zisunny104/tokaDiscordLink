@@ -1,6 +1,6 @@
 name: tokaDiscordLink
 main: dev.toka.discord.Main
-version: "0.3.18"
+version: "0.3.19"
 api: ["1.0.0"]
 author: zisunny104
 description: 遊戲與 Discord 之間的串聯：機器人、訊息收發、指令事件，並預留帳號綁定介面

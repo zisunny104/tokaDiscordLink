@@ -39,6 +39,32 @@ public final class MemberSync {
     /** group name in the game -> id of the Discord role */
     private final Map<String, String> roles = java.util.Collections.synchronizedMap(new LinkedHashMap<>());
 
+    /** Counts what a round of sync or check did, and says so once everything it started has finished. */
+    public static final class Report {
+        public final java.util.concurrent.atomic.AtomicInteger accounts = new java.util.concurrent.atomic.AtomicInteger(),
+                added = new java.util.concurrent.atomic.AtomicInteger(), removed = new java.util.concurrent.atomic.AtomicInteger(),
+                nicknames = new java.util.concurrent.atomic.AtomicInteger(), notFound = new java.util.concurrent.atomic.AtomicInteger(),
+                failed = new java.util.concurrent.atomic.AtomicInteger(), unknownGroups = new java.util.concurrent.atomic.AtomicInteger(),
+                differences = new java.util.concurrent.atomic.AtomicInteger();
+        private final java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger();
+        private volatile java.util.function.Consumer<Report> done;
+
+        void begin() { pending.incrementAndGet(); }
+
+        void end(MemberSync owner) {
+            if (pending.decrementAndGet() == 0 && done != null) {
+                var callback = done;
+                owner.plugin.getServer().getScheduler().scheduleTask(owner.plugin, () -> callback.accept(this));
+            }
+        }
+    }
+
+    private final java.util.concurrent.ExecutorService lookups = java.util.concurrent.Executors.newFixedThreadPool(2, task -> {
+        Thread thread = new Thread(task, "tokaDiscordLink-groups");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private volatile JDA jda;
     private volatile String guildId;
     private volatile Function<UUID, String> nameProvider = null;
@@ -154,24 +180,52 @@ public final class MemberSync {
 
     /** Brings the nickname and the roles of one linked account in line with the game. Never blocks the caller. */
     public void sync(UUID player, String discordUserId) {
-        JDA client = this.jda;
-        if (client == null || this.guildId == null) {
+        sync(player, discordUserId, null);
+    }
+
+    /**
+     * The groups of the player: read at once when they are online, through LuckPerms on a worker thread when they are not (a player who is
+     * offline is synced like any other). The callback gets null when the groups cannot be told, and then no role is changed.
+     * Called on the server thread.
+     */
+    private void groupsOf(UUID player, java.util.function.Consumer<Set<String>> then) {
+        if (this.roles.isEmpty()) {
+            then.accept(null);
             return;
         }
-        Guild guild = client.getGuildById(this.guildId);
+        Set<String> online = this.currentGroups(player);
+        if (online != null) {
+            then.accept(online);
+            return;
+        }
+        Set<String> wanted = this.roles().keySet();
+        this.lookups.execute(() -> then.accept(OfflineGroups.of(this.plugin, player, wanted)));
+    }
+
+    private void sync(UUID player, String discordUserId, Report report) {
+        JDA client = this.jda;
+        Guild guild = client == null || this.guildId == null ? null : client.getGuildById(this.guildId);
         if (guild == null) {
+            if (report != null) { report.failed.incrementAndGet(); report.end(this); }
             return;
         }
         // the game objects are read on the server thread; the Discord calls then run on the JDA threads
         this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> {
             String nick = this.expectedNickname(player);
-            Set<String> groups = this.currentGroups(player);
-            guild.retrieveMemberById(discordUserId)
-                    .queue(member -> this.apply(guild, member, nick, groups), error -> { });
+            this.groupsOf(player, groups -> {
+                if (report != null) {
+                    report.accounts.incrementAndGet();
+                    if (groups == null && !this.roles.isEmpty()) report.unknownGroups.incrementAndGet();
+                }
+                guild.retrieveMemberById(discordUserId)
+                        .queue(member -> this.apply(guild, member, nick, groups, report), error -> {
+                            if (report != null) { report.notFound.incrementAndGet(); report.end(this); }
+                        });
+            });
         });
     }
 
-    /** The mapped groups the player has now, or null when the player is offline (nothing is taken away then). */
+    /** The mapped groups the player has now, or null when the player is offline (the caller then asks LuckPerms). */
     private Set<String> currentGroups(UUID player) {
         Player online = this.roles.isEmpty() ? null : Server.getInstance().getPlayer(player).orElse(null);
         if (online == null) {
@@ -186,69 +240,99 @@ public final class MemberSync {
         return groups;
     }
 
-    private void apply(Guild guild, Member member, String nick, Set<String> groups) {
+    private void apply(Guild guild, Member member, String nick, Set<String> groups, Report report) {
         if (nick != null && !nick.equals(member.getNickname()) && !member.isOwner()
                 && guild.getSelfMember().canInteract(member)) {
-            member.modifyNickname(nick).queue(null, error -> { });
+            if (report != null) report.begin();
+            member.modifyNickname(nick).queue(done -> {
+                if (report != null) { report.nicknames.incrementAndGet(); report.end(this); }
+            }, error -> {
+                if (report != null) { report.failed.incrementAndGet(); report.end(this); }
+            });
         }
 
-        if (groups == null) {
-            return;
+        if (groups != null) {
+            for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
+                Role role = guild.getRoleById(mapping.getValue());
+                if (role == null) {
+                    this.complain("log.roleMissing", mapping.getValue(), mapping.getKey());
+                    continue;
+                }
+                if (!guild.getSelfMember().canInteract(role)) {
+                    this.complain("log.roleAbove", role.getName(), mapping.getKey());
+                    continue;
+                }
+                boolean should = groups.contains(mapping.getKey());
+                boolean has = member.getRoles().contains(role);
+                if (should && !has && !this.roleMode.equals("check")) {
+                    if (report != null) report.begin();
+                    guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(
+                            done -> {
+                                this.plugin.getLogger().info(this.plugin.messages().text("log.roleAdded", role.getName(), member.getEffectiveName()));
+                                if (report != null) { report.added.incrementAndGet(); report.end(this); }
+                            },
+                            error -> {
+                                this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage()));
+                                if (report != null) { report.failed.incrementAndGet(); report.end(this); }
+                            });
+                } else if (!should && has && this.roleMode.equals("sync")) {
+                    if (report != null) report.begin();
+                    guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(
+                            done -> {
+                                this.plugin.getLogger().info(this.plugin.messages().text("log.roleRemoved", role.getName(), member.getEffectiveName()));
+                                if (report != null) { report.removed.incrementAndGet(); report.end(this); }
+                            },
+                            error -> {
+                                this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage()));
+                                if (report != null) { report.failed.incrementAndGet(); report.end(this); }
+                            });
+                }
+            }
         }
-        for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
-            Role role = guild.getRoleById(mapping.getValue());
-            if (role == null) {
-                this.complain("log.roleMissing", mapping.getValue(), mapping.getKey());
-                continue;
-            }
-            if (!guild.getSelfMember().canInteract(role)) {
-                this.complain("log.roleAbove", role.getName(), mapping.getKey());
-                continue;
-            }
-            boolean should = groups.contains(mapping.getKey());
-            boolean has = member.getRoles().contains(role);
-            if (should && !has && !this.roleMode.equals("check")) {
-                guild.addRoleToMember(UserSnowflake.fromId(member.getId()), role).queue(
-                        done -> this.plugin.getLogger().info(this.plugin.messages().text("log.roleAdded", role.getName(), member.getEffectiveName())),
-                        error -> this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage())));
-            } else if (!should && has && this.roleMode.equals("sync")) {
-                guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(
-                        done -> this.plugin.getLogger().info(this.plugin.messages().text("log.roleRemoved", role.getName(), member.getEffectiveName())),
-                        error -> this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage())));
-            }
-        }
+        if (report != null) report.end(this);
     }
 
     /**
-     * Reads, changes nothing: for every linked player who is online, tells where the roles on Discord differ from the groups in the game.
-     * The lines come back on the server thread.
+     * Reads, changes nothing: for every linked player, online or not, tells where the roles on Discord differ from the groups in the game.
+     * The lines and the final report come back on the server thread.
      */
-    public void check(java.util.function.Consumer<String[]> out) {
+    public void check(java.util.function.Consumer<String[]> out, java.util.function.Consumer<Report> finished) {
         JDA client = this.jda;
         Guild guild = client == null || this.guildId == null ? null : client.getGuildById(this.guildId);
-        if (guild == null) {
+        Report report = new Report();
+        report.done = finished;
+        Map<UUID, String> all = this.links.all();
+        if (guild == null || all.isEmpty()) {
+            this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> finished.accept(report));
             return;
         }
-        for (Map.Entry<UUID, String> link : this.links.all().entrySet()) {
-            Set<String> groups = this.currentGroups(link.getKey());
-            if (groups == null) {
-                continue;
-            }
-            String name = this.nameOf(link.getKey());
-            guild.retrieveMemberById(link.getValue()).queue(member -> {
-                for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
-                    Role role = guild.getRoleById(mapping.getValue());
-                    if (role == null) {
-                        continue;
-                    }
-                    boolean should = groups.contains(mapping.getKey());
-                    boolean has = member.getRoles().contains(role);
-                    if (should != has) {
-                        String[] difference = {name, role.getName(), String.valueOf(should), String.valueOf(has)};
-                        this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> out.accept(difference));
-                    }
+        for (int i = 0; i < all.size(); i++) report.begin();
+        for (Map.Entry<UUID, String> link : all.entrySet()) {
+            this.groupsOf(link.getKey(), groups -> {
+                report.accounts.incrementAndGet();
+                if (groups == null) {
+                    report.unknownGroups.incrementAndGet();
+                    report.end(this);
+                    return;
                 }
-            }, error -> { });
+                String name = this.nameOf(link.getKey());
+                guild.retrieveMemberById(link.getValue()).queue(member -> {
+                    for (Map.Entry<String, String> mapping : this.roles().entrySet()) {
+                        Role role = guild.getRoleById(mapping.getValue());
+                        if (role == null) {
+                            continue;
+                        }
+                        boolean should = groups.contains(mapping.getKey());
+                        boolean has = member.getRoles().contains(role);
+                        if (should != has) {
+                            report.differences.incrementAndGet();
+                            String[] difference = {name, role.getName(), String.valueOf(should), String.valueOf(has)};
+                            this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> out.accept(difference));
+                        }
+                    }
+                    report.end(this);
+                }, error -> { report.notFound.incrementAndGet(); report.end(this); });
+            });
         }
     }
 
@@ -284,14 +368,33 @@ public final class MemberSync {
         return this.links.all().isEmpty() || (this.nicknameMode == NicknameMode.OFF && this.roles.isEmpty());
     }
 
-    /** All the linked accounts, one after the other, spread over the given time so that the rate limits hold. */
+    /** The number of linked accounts a round of sync goes through. */
+    public int accounts() {
+        return this.links.all().size();
+    }
+
+    /** All the linked accounts, online or not, one after the other, spread over time so that the rate limits hold. */
     public void syncAll() {
+        syncAll(null);
+    }
+
+    /** Same, and calls {@code finished} (on the server thread) with what was done once every account and every change has finished. */
+    public void syncAll(java.util.function.Consumer<Report> finished) {
         Map<UUID, String> all = this.links.all();
+        Report report = finished == null ? null : new Report();
+        if (report != null) {
+            report.done = finished;
+            if (all.isEmpty()) {
+                this.plugin.getServer().getScheduler().scheduleTask(this.plugin, () -> finished.accept(report));
+                return;
+            }
+            for (int i = 0; i < all.size(); i++) report.begin();
+        }
         long delay = 0;
         for (Map.Entry<UUID, String> entry : all.entrySet()) {
             final long at = delay;
             this.plugin.getServer().getScheduler().scheduleDelayedTask(this.plugin,
-                    () -> this.sync(entry.getKey(), entry.getValue()), (int) at);
+                    () -> this.sync(entry.getKey(), entry.getValue(), report), (int) at);
             delay += 10;
         }
     }

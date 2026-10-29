@@ -54,7 +54,7 @@ public class LanguageFileTest {
         Messages messages = new Messages(getClass().getClassLoader(), Paths.get("target", "no-lang-folder"), "zh-TW", line -> fail(line));
         for (Map.Entry<String, Object> entry : keys.entrySet()) {
             assertTrue(entry.getKey(), messages.has(entry.getKey()));
-            assertFalse(entry.getKey(), messages.lines(entry.getKey(), "a", "b", "c").isEmpty());
+            assertFalse(entry.getKey(), messages.lines(entry.getKey(), "a", "b", "c", "d", "e", "f", "g", "h").isEmpty());
         }
     }
 
