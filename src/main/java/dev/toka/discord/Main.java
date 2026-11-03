@@ -183,8 +183,10 @@ public final class Main extends PluginBase implements Listener {
     private void suggest(String name, CommandParameter[]... forms) {
         Command registered = (Command) getCommand(name);
         if (registered == null) return;
-        registered.getCommandParameters().clear();
-        for (int i = 0; i < forms.length; i++) registered.addCommandParameters("choice" + i, forms[i]);
+        // Built aside and swapped in whole: the network thread encodes the command list at any moment, and a half-built map would leave enum references dangling.
+        var rebuiltParams = new java.util.HashMap<String, cn.nukkit.command.data.CommandParameter[]>();
+        for (int i = 0; i < forms.length; i++) rebuiltParams.put("choice" + i, forms[i]);
+        registered.setCommandParameters(rebuiltParams);
     }
 
     /** The next round comes at the normal interval, or at the longer one when there is nothing to sync. */
