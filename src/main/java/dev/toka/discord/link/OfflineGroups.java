@@ -15,12 +15,15 @@ import java.util.concurrent.TimeUnit;
 final class OfflineGroups {
     private OfflineGroups() { }
 
+    /** A key with a dot is a permission node (toka.identity.sponsor) asked for as it stands; any other key is a group name. */
+    static boolean isNode(String key) { return key.indexOf('.') >= 0; }
+
     private static Plugin luckPerms(Plugin plugin) {
         Plugin luckPerms = plugin.getServer().getPluginManager().getPlugin("LuckPerms");
         return luckPerms != null && luckPerms.isEnabled() ? luckPerms : null;
     }
 
-    /** Which of the given groups the player has; null when LuckPerms cannot tell. Blocks: never call it on the server thread. */
+    /** Which of the given groups or permission nodes the player has; null when LuckPerms cannot tell. Blocks: never call it on the server thread. */
     static Set<String> of(Plugin plugin, UUID player, Set<String> wanted) {
         Plugin luckPerms = luckPerms(plugin);
         if (luckPerms == null || Server.getInstance().isPrimaryThread()) return null;
@@ -36,7 +39,7 @@ final class OfflineGroups {
             var truth = Class.forName("net.luckperms.api.util.Tristate", true, loader).getMethod("asBoolean");
             Set<String> found = new HashSet<>();
             for (String group : wanted) {
-                if ((Boolean) truth.invoke(check.invoke(permissions, "group." + group))) found.add(group);
+                if ((Boolean) truth.invoke(check.invoke(permissions, isNode(group) ? group : "group." + group))) found.add(group);
             }
             if (Server.getInstance().getPlayer(player).isEmpty()) {
                 try { manager.getMethod("cleanupUser", Class.forName("net.luckperms.api.model.user.User", true, loader)).invoke(users, user); }

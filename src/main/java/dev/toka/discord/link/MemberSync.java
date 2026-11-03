@@ -199,7 +199,10 @@ public final class MemberSync {
             return;
         }
         Set<String> wanted = this.roles().keySet();
-        this.lookups.execute(() -> then.accept(OfflineGroups.of(this.plugin, player, wanted)));
+        this.lookups.execute(() -> {
+            Set<String> found = OfflineGroups.of(this.plugin, player, wanted);
+            then.accept(found == null ? null : wanted.stream().allMatch(OfflineGroups::isNode) ? found : new Offline(found));
+        });
     }
 
     private void sync(UUID player, String discordUserId, Report report) {
@@ -228,7 +231,8 @@ public final class MemberSync {
     /** The mapped groups the player has now, or null when the player is offline (the caller then asks LuckPerms). */
     private Set<String> currentGroups(UUID player) {
         Player online = this.roles.isEmpty() ? null : Server.getInstance().getPlayer(player).orElse(null);
-        if (online == null) {
+        // a permission node is asked of LuckPerms for everyone: online, a wildcard such as * would answer yes to any node
+        if (online == null || this.roles().keySet().stream().anyMatch(OfflineGroups::isNode)) {
             return null;
         }
         Set<String> groups = new HashSet<>();
@@ -238,6 +242,14 @@ public final class MemberSync {
             }
         }
         return groups;
+    }
+
+    /**
+     * Groups read for a player who is offline. LuckPerms answers without the server and world the player is in, so a group given only
+     * there can look missing; such a result may add roles but never removes one, and the next sync while the player is online decides.
+     */
+    private static final class Offline extends HashSet<String> {
+        Offline(Set<String> found) { super(found); }
     }
 
     private void apply(Guild guild, Member member, String nick, Set<String> groups, Report report) {
@@ -275,7 +287,7 @@ public final class MemberSync {
                                 this.complain("log.roleFailed", role.getName(), String.valueOf(error.getMessage()));
                                 if (report != null) { report.failed.incrementAndGet(); report.end(this); }
                             });
-                } else if (!should && has && this.roleMode.equals("sync")) {
+                } else if (!should && has && this.roleMode.equals("sync") && !(groups instanceof Offline)) {
                     if (report != null) report.begin();
                     guild.removeRoleFromMember(UserSnowflake.fromId(member.getId()), role).queue(
                             done -> {
